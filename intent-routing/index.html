@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>01 · Intent Routing — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root { --accent: #6C63FF; --accent2: #9B8FFF; }
+.pipeline-diagram{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:nowrap;margin-bottom:48px;overflow-x:auto;padding:10px 0}
+.pipe-node{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:130px}
+.pipe-box{border-radius:12px;padding:14px 18px;text-align:center;border:1px solid;font-size:12px;font-weight:600;transition:all .4s;position:relative;min-width:120px}
+.pipe-box-label{font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin-top:4px}
+.pipe-user{background:rgba(108,99,255,.1);border-color:rgba(108,99,255,.3);color:var(--accent2)}
+.pipe-trie{background:rgba(0,212,164,.08);border-color:rgba(0,212,164,.2);color:var(--teal)}
+.pipe-hash{background:rgba(255,179,71,.08);border-color:rgba(255,179,71,.2);color:var(--amber)}
+.pipe-agent{background:rgba(91,219,133,.08);border-color:rgba(91,219,133,.2);color:var(--green)}
+.pipe-arrow{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 8px}
+.pipe-arrow-line{width:40px;height:2px;background:var(--border2);position:relative}
+.pipe-arrow-head{width:0;height:0;border-left:7px solid var(--border2);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.pipe-arrow-label{font-size:10px;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
+.packet-container{position:relative;margin:0 auto 40px;max-width:900px}
+.packet-track{position:relative;height:6px;background:var(--border);border-radius:3px;overflow:visible;margin-bottom:10px}
+.packet-dot{position:absolute;top:-7px;width:20px;height:20px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px rgba(108,99,255,.6);transition:left 0.7s cubic-bezier(.4,0,.2,1);left:0;display:flex;align-items:center;justify-content:center}
+.packet-dot::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff;opacity:.8}
+.packet-fill{position:absolute;top:0;left:0;height:100%;background:linear-gradient(90deg,var(--accent),var(--teal));border-radius:3px;transition:width 0.7s cubic-bezier(.4,0,.2,1);width:0}
+.packet-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);letter-spacing:.04em}
+.step-log{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px 20px;font-family:var(--mono);font-size:12px;line-height:2;min-height:80px;margin-bottom:20px}
+.log-line{opacity:0;transform:translateY(4px);transition:all .3s}
+.log-line.show{opacity:1;transform:none}
+.log-dim{color:var(--dim)}.log-teal{color:var(--teal)}.log-accent{color:var(--accent2)}.log-amber{color:var(--amber)}.log-green{color:var(--green)}.log-pink{color:var(--pink)}
+.pipeline-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hash-table{display:flex;flex-direction:column;gap:6px}
+.hash-row{display:grid;grid-template-columns:110px 24px 1fr;align-items:center;border-radius:8px;overflow:hidden;transition:all .3s}
+.hash-key-cell{background:var(--bg3);padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px}
+.hash-arr-cell{background:var(--bg3);padding:10px 2px;font-size:12px;color:var(--dim);border:1px solid var(--border);border-left:none;border-right:none;text-align:center}
+.hash-val-cell{padding:10px 12px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-left:none;border-radius:0 8px 8px 0;transition:all .3s}
+.hv-billing{background:rgba(108,99,255,.08);color:var(--accent2)}
+.hv-tech{background:rgba(0,212,164,.08);color:var(--teal)}
+.hv-refund{background:rgba(255,107,157,.08);color:var(--pink)}
+.hv-account{background:rgba(255,179,71,.08);color:var(--amber)}
+.hv-default{background:var(--bg3);color:var(--dim)}
+.hash-row.lit .hash-key-cell{border-color:var(--amber);background:rgba(255,179,71,.08)}
+.hash-row.lit .hash-val-cell{transform:scale(1.02);box-shadow:0 0 0 1px var(--amber)}
+.dispatch-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:16px;display:flex;align-items:center;justify-content:space-between;min-height:52px}
+.dispatch-label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.dispatch-agent{font-family:var(--mono);font-size:14px;font-weight:500;transition:all .3s}
+.trie-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:start}
+.trie-canvas-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.trace-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.9;min-height:72px;color:var(--muted);transition:all .3s}
+.trace-step{color:var(--text)}.trace-match{color:var(--teal);font-weight:600}.trace-miss{color:var(--pink)}
+.tnode circle,.mtnode circle{transition:fill .3s,stroke .3s,stroke-width .3s}
+.tnode text,.mtnode text{transition:fill .3s}
+.tedge,.mtedge{transition:stroke .3s,stroke-width .3s}
+.tnode.active circle,.mtnode.active circle{fill:#1D4A3A;stroke:#00D4A4;stroke-width:2}
+.tnode.active text,.mtnode.active text{fill:#00FFB3}
+.tnode.matched circle,.mtnode.matched circle{fill:#2D1F5E;stroke:#6C63FF;stroke-width:2.5}
+.tnode.matched text,.mtnode.matched text{fill:#A09BFF}
+.tedge.active,.mtedge.active{stroke:#00D4A4 !important;stroke-width:2.2 !important}
+.compare-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+.cmp-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:26px;position:relative;overflow:hidden}
+.cmp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.cmp-card.hashmap::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.cmp-card.trie::before{background:linear-gradient(90deg,var(--teal),var(--teal2))}
+.cmp-card.llm::before{background:linear-gradient(90deg,var(--amber),var(--pink))}
+.cmp-name{font-size:15px;font-weight:700;margin-bottom:4px}
+.cmp-complexity{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:16px}
+.cmp-list{list-style:none;display:flex;flex-direction:column;gap:6px}
+.cmp-list li{font-size:13px;color:var(--muted);display:flex;gap:7px;line-height:1.5}
+.pro-icon{color:var(--green)}.con-icon{color:var(--pink)}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px}
+.concept-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;transition:border-color .2s}
+.concept-card:hover{border-color:var(--border2)}
+.concept-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px}
+.concept-title{font-size:14px;font-weight:600;margin-bottom:6px}
+.concept-body{font-size:13px;color:var(--muted);line-height:1.6}
+@media(max-width:768px){
+  .trie-layout,.compare-grid,.concept-grid{grid-template-columns:1fr}
+  .pipeline-diagram{justify-content:flex-start}
+  .pipe-arrow-line{width:24px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage active" style="background:rgba(108,99,255,.2);color:#9B8FFF;border-color:rgba(108,99,255,.4)">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage">04 Search</a>
+    <a href="../scheduling/" class="nav-stage">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage">06 Async</a>
+    <a href="../guardrails/" class="nav-stage">07 Guard</a>
+    <a href="../streaming/" class="nav-stage">08 Stream</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="eyebrow"><span class="eyebrow-dot"></span>Stage 01 · Multi-agent AI systems</div>
+  <h1>Trie <em style="color:#9B8FFF">detects</em>. Hash map <em style="color:#9B8FFF">dispatches</em>.<br/>Together they route your intent.</h1>
+  <p class="hero-sub">Two data structures working in a pipeline — the trie scans your text for a keyword, the hash map instantly maps it to the right agent.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#pipeline" class="btn-primary">See the live pipeline</a>
+    <a href="#trie" class="btn-secondary">Explore individually</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <div class="section-label">Overview</div>
+  <div class="section-title">Two structures, one pipeline</div>
+  <p class="section-sub">They solve different halves of the routing problem — detection and dispatch — and compose naturally into a fast, transparent pipeline.</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(0,212,164,.1)">🌲</div>
+      <div class="concept-title">Step 1 — Trie scans</div>
+      <div class="concept-body">The prefix trie walks your raw text character by character to detect which intent keyword appears. O(L) where L is the keyword length.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,179,71,.1)">⚡</div>
+      <div class="concept-title">Step 2 — Hash map dispatches</div>
+      <div class="concept-body">Once the intent string is extracted, a single O(1) dictionary lookup returns the correct agent class. Instant, no matter how many agents exist.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(91,219,133,.1)">🤖</div>
+      <div class="concept-title">Step 3 — Agent handles</div>
+      <div class="concept-body">The resolved agent receives the original user query and processes it. The routing pipeline is complete in microseconds.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- PIPELINE LIVE -->
+<div class="full-bg" id="pipeline">
+<div class="full-bg-wrap">
+  <div class="section-label">Live pipeline</div>
+  <div class="section-title">Watch a query travel through the system</div>
+  <p class="section-sub">Pick a query and hit Run — watch it flow from raw text through trie detection, into the hash map, and arrive at the agent.</p>
+  <div class="pipeline-diagram">
+    <div class="pipe-node"><div class="pipe-box pipe-user" id="pb-user">User input</div><div class="pipe-box-label">Raw text</div></div>
+    <div class="pipe-arrow"><div class="pipe-arrow-label">scan text</div><div style="display:flex;align-items:center"><div class="pipe-arrow-line"></div><div class="pipe-arrow-head"></div></div></div>
+    <div class="pipe-node"><div class="pipe-box pipe-trie" id="pb-trie">Prefix trie</div><div class="pipe-box-label">O(L) detection</div></div>
+    <div class="pipe-arrow"><div class="pipe-arrow-label">intent string</div><div style="display:flex;align-items:center"><div class="pipe-arrow-line"></div><div class="pipe-arrow-head"></div></div></div>
+    <div class="pipe-node"><div class="pipe-box pipe-hash" id="pb-hash">Hash map</div><div class="pipe-box-label">O(1) dispatch</div></div>
+    <div class="pipe-arrow"><div class="pipe-arrow-label">agent class</div><div style="display:flex;align-items:center"><div class="pipe-arrow-line"></div><div class="pipe-arrow-head"></div></div></div>
+    <div class="pipe-node"><div class="pipe-box pipe-agent" id="pb-agent">Agent</div><div class="pipe-box-label">Handles query</div></div>
+  </div>
+  <div class="packet-container">
+    <div class="packet-track"><div class="packet-fill" id="packet-fill"></div><div class="packet-dot" id="packet-dot"></div></div>
+    <div class="packet-labels"><span>User input</span><span>Trie scan</span><span>Hash map</span><span>Agent</span></div>
+  </div>
+  <div class="step-log" id="step-log"><div style="color:var(--dim)">Choose a query below and press Run to trace the full pipeline…</div></div>
+  <div class="pipeline-controls">
+    <select class="query-select" id="pipe-query">
+      <option value="I have a billing issue with my invoice">I have a billing issue with my invoice</option>
+      <option value="my wifi is not working at all">my wifi is not working at all</option>
+      <option value="I want to refund my order please">I want to refund my order please</option>
+      <option value="how do I reset my account password">how do I reset my account password</option>
+      <option value="what time does the store open">what time does the store open (unknown)</option>
+    </select>
+    <button class="btn-run" id="btn-run" onclick="runPipeline()">▶ Run pipeline</button>
+    <button class="btn-reset" onclick="resetPipeline()">Reset</button>
+    <span class="status-badge" id="pipe-status" style="background:var(--surface2);color:var(--dim)">idle</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:40px">
+    <div class="panel-box">
+      <div class="panel-header"><div class="panel-header-title">Trie traversal</div><span class="badge badge-teal" style="font-size:10px">Step 1</span></div>
+      <div style="padding:12px">
+        <svg id="mini-trie" viewBox="0 0 440 310" width="100%" style="display:block">
+          <line id="me-rb" x1="220" y1="40" x2="90" y2="100" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-rt" x1="220" y1="40" x2="220" y2="100" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-rr" x1="220" y1="40" x2="350" y2="100" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-bbi" x1="90" y1="100" x2="50" y2="170" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-bba" x1="90" y1="100" x2="130" y2="170" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-tte" x1="220" y1="100" x2="185" y2="170" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-ttr" x1="220" y1="100" x2="255" y2="170" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-rre" x1="350" y1="100" x2="350" y2="170" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-bil" x1="50" y1="170" x2="50" y2="240" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-bac" x1="130" y1="170" x2="130" y2="240" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-tec" x1="185" y1="170" x2="185" y2="240" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-tre" x1="255" y1="170" x2="255" y2="240" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <line id="me-ref" x1="350" y1="170" x2="350" y2="240" stroke="#2A2A3A" stroke-width="1.2" class="mtedge"/>
+          <text x="50" y="278" text-anchor="middle" font-size="8" fill="#6C63FF" font-family="'JetBrains Mono',monospace">→ Billing</text>
+          <text x="130" y="278" text-anchor="middle" font-size="8" fill="#FFB347" font-family="'JetBrains Mono',monospace">→ Account</text>
+          <text x="185" y="278" text-anchor="middle" font-size="8" fill="#00D4A4" font-family="'JetBrains Mono',monospace">→ Support</text>
+          <text x="255" y="278" text-anchor="middle" font-size="8" fill="#FF6B9D" font-family="'JetBrains Mono',monospace">→ Refund</text>
+          <text x="350" y="278" text-anchor="middle" font-size="8" fill="#FF6B9D" font-family="'JetBrains Mono',monospace">→ Refund</text>
+          <g class="mtnode" id="mn-root"><circle cx="220" cy="28" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.5"/><text x="220" y="28" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8080A0" font-family="'JetBrains Mono',monospace">root</text></g>
+          <g class="mtnode" id="mn-b"><circle cx="90" cy="100" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="90" y="100" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#8080A0" font-family="'JetBrains Mono',monospace">b</text></g>
+          <g class="mtnode" id="mn-t"><circle cx="220" cy="100" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="220" y="100" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#8080A0" font-family="'JetBrains Mono',monospace">t</text></g>
+          <g class="mtnode" id="mn-r"><circle cx="350" cy="100" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="350" y="100" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#8080A0" font-family="'JetBrains Mono',monospace">r</text></g>
+          <g class="mtnode" id="mn-bi"><circle cx="50" cy="170" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="50" y="170" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#8080A0" font-family="'JetBrains Mono',monospace">bi</text></g>
+          <g class="mtnode" id="mn-ba"><circle cx="130" cy="170" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="130" y="170" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#8080A0" font-family="'JetBrains Mono',monospace">ba</text></g>
+          <g class="mtnode" id="mn-te"><circle cx="185" cy="170" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="185" y="170" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#8080A0" font-family="'JetBrains Mono',monospace">te</text></g>
+          <g class="mtnode" id="mn-tr"><circle cx="255" cy="170" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="255" y="170" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#8080A0" font-family="'JetBrains Mono',monospace">tr</text></g>
+          <g class="mtnode" id="mn-re"><circle cx="350" cy="170" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="350" y="170" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#8080A0" font-family="'JetBrains Mono',monospace">re</text></g>
+          <g class="mtnode" id="mn-bil"><circle cx="50" cy="240" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="50" y="240" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">bil</text></g>
+          <g class="mtnode" id="mn-bac"><circle cx="130" cy="240" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="130" y="240" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">bac</text></g>
+          <g class="mtnode" id="mn-tech"><circle cx="185" cy="240" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="185" y="240" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="'JetBrains Mono',monospace">tech</text></g>
+          <g class="mtnode" id="mn-tref"><circle cx="255" cy="240" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="255" y="240" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="'JetBrains Mono',monospace">tref</text></g>
+          <g class="mtnode" id="mn-ref"><circle cx="350" cy="240" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="350" y="240" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">ref</text></g>
+        </svg>
+        <div id="mini-trie-status" style="padding:0 12px 12px;font-family:var(--mono);font-size:11px;color:var(--dim)">Waiting…</div>
+      </div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-header"><div class="panel-header-title">Hash map lookup</div><span class="badge badge-amber" style="font-size:10px">Step 2</span></div>
+      <div style="padding:16px">
+        <div class="hash-table" id="mini-hash-table">
+          <div class="hash-row" id="mhr-billing"><div class="hash-key-cell">"billing"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-billing">BillingAgent</div></div>
+          <div style="height:4px"></div>
+          <div class="hash-row" id="mhr-tech"><div class="hash-key-cell">"tech"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-tech">SupportAgent</div></div>
+          <div style="height:4px"></div>
+          <div class="hash-row" id="mhr-refund"><div class="hash-key-cell">"refund"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-refund">RefundAgent</div></div>
+          <div style="height:4px"></div>
+          <div class="hash-row" id="mhr-account"><div class="hash-key-cell">"account"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-account">AccountAgent</div></div>
+          <div style="height:4px"></div>
+          <div class="hash-row" id="mhr-default"><div class="hash-key-cell" style="opacity:.5">default</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-default">FallbackAgent</div></div>
+        </div>
+        <div id="mini-hash-status" style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--dim)">Waiting for trie output…</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- HASH MAP DEEP DIVE -->
+<div class="full-bg" id="hashmap">
+<div class="full-bg-wrap">
+  <div class="section-label">Data structure #1</div>
+  <div class="section-title">Hash map — the dispatcher</div>
+  <p class="section-sub">After detection, the intent string is the key. One dict.get() call returns the agent class in O(1) regardless of how many agents you have.</p>
+  <div class="two-col">
+    <div>
+      <div class="panel-box">
+        <div class="panel-header"><div class="panel-header-title">Interactive demo</div><span class="badge badge-teal">O(1) dispatch</span></div>
+        <div class="panel-body">
+          <div style="margin-bottom:14px"><input class="query-input" id="hm-input" placeholder="Type a query… e.g. 'billing issue'" oninput="routeHash(this.value)"/></div>
+          <div class="chips">
+            <span class="chip chip-purple" onclick="setHM('charge on my bill')">charge on bill</span>
+            <span class="chip chip-teal" onclick="setHM('wifi not working')">wifi not working</span>
+            <span class="chip chip-pink" onclick="setHM('I want a refund')">want a refund</span>
+            <span class="chip chip-amber" onclick="setHM('reset my password')">reset password</span>
+            <span class="chip chip-dim" onclick="setHM('random stuff here')">unknown query</span>
+          </div>
+          <div class="hash-table">
+            <div class="hash-row" id="hr-billing"><div class="hash-key-cell">"billing"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-billing">BillingAgent</div></div>
+            <div style="height:4px"></div>
+            <div class="hash-row" id="hr-tech"><div class="hash-key-cell">"tech"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-tech">SupportAgent</div></div>
+            <div style="height:4px"></div>
+            <div class="hash-row" id="hr-refund"><div class="hash-key-cell">"refund"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-refund">RefundAgent</div></div>
+            <div style="height:4px"></div>
+            <div class="hash-row" id="hr-account"><div class="hash-key-cell">"account"</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-account">AccountAgent</div></div>
+            <div style="height:4px"></div>
+            <div class="hash-row" id="hr-default"><div class="hash-key-cell" style="opacity:.5">default</div><div class="hash-arr-cell">→</div><div class="hash-val-cell hv-default">FallbackAgent</div></div>
+          </div>
+          <div class="dispatch-box">
+            <div><div class="dispatch-label">Dispatched to</div><div class="dispatch-agent" id="hm-result" style="color:var(--dim)">Waiting…</div></div>
+            <span class="badge badge-teal" id="hm-time" style="display:none">O(1)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="code-block">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · Hash map dispatch</div></div>
+        <div class="code-body"><pre><span class="hl-cm"># Intent → Agent mapping (O(1) lookup)</span>
+<span class="hl-nb">router</span> = {
+    <span class="hl-st">"billing"</span>:  <span class="hl-cl">BillingAgent</span>,
+    <span class="hl-st">"tech"</span>:     <span class="hl-cl">SupportAgent</span>,
+    <span class="hl-st">"refund"</span>:   <span class="hl-cl">RefundAgent</span>,
+    <span class="hl-st">"account"</span>:  <span class="hl-cl">AccountAgent</span>,
+}
+
+<span class="hl-kw">def</span> <span class="hl-fn">route</span>(intent: <span class="hl-cl">str</span>):
+    agent = router.<span class="hl-fn">get</span>(intent, <span class="hl-cl">FallbackAgent</span>)
+    <span class="hl-kw">return</span> agent.<span class="hl-fn">handle</span>(user_input)
+
+<span class="hl-cm"># LangChain RouterChain uses same pattern</span>
+<span class="hl-kw">from</span> langchain.chains.router <span class="hl-kw">import</span> <span class="hl-cl">RouterChain</span>
+chain = <span class="hl-cl">RouterChain</span>(
+    routes={
+        <span class="hl-st">"billing"</span>: billing_chain,
+        <span class="hl-st">"tech"</span>:    support_chain,
+    },
+    default_chain=fallback_chain
+)
+
+<span class="hl-cm"># Even LLM routers end here:</span>
+<span class="hl-cm"># LLM classifies → hash map dispatches</span></pre></div>
+      </div>
+      <div style="margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+        <div style="font-size:12px;font-weight:600;color:var(--amber);margin-bottom:10px">Key insight</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">Even when an LLM classifies the intent, the final dispatch step is always a dictionary lookup. The LLM replaces the scanner — not the hash map.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- TRIE DEEP DIVE -->
+<div id="trie">
+<div style="max-width:1100px;margin:0 auto;padding:80px 40px">
+  <div class="section-label">Data structure #2</div>
+  <div class="section-title">Prefix trie — the detector</div>
+  <p class="section-sub">The trie scans raw text character by character. When it hits a terminal node, it has found the intent keyword and hands the string to the hash map.</p>
+  <div class="trie-layout">
+    <div>
+      <div class="trie-canvas-wrap">
+        <div class="panel-header"><div class="panel-header-title">Walk the tree</div><span class="badge badge-teal">O(L) detection</span></div>
+        <div style="padding:16px 16px 8px">
+          <input class="query-input" id="trie-input" placeholder="Type a prefix… e.g. 'bill'" oninput="walkTrie(this.value)" maxlength="10"/>
+          <div class="chips" style="margin-top:10px">
+            <span class="chip chip-purple" onclick="setTrie('billing')">billing</span>
+            <span class="chip chip-teal" onclick="setTrie('tech')">tech</span>
+            <span class="chip chip-pink" onclick="setTrie('refund')">refund</span>
+            <span class="chip chip-amber" onclick="setTrie('account')">account</span>
+            <span class="chip chip-purple" onclick="setTrie('bill')">bill</span>
+            <span class="chip chip-teal" onclick="setTrie('te')">te</span>
+          </div>
+        </div>
+        <svg id="trie-svg" viewBox="0 0 440 360" width="100%" style="padding:0 10px 10px;display:block">
+          <line id="e-rb" x1="220" y1="44" x2="90" y2="114" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-rt" x1="220" y1="44" x2="220" y2="114" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-rr" x1="220" y1="44" x2="350" y2="114" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-bbi" x1="90" y1="114" x2="50" y2="184" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-bba" x1="90" y1="114" x2="130" y2="184" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-tte" x1="220" y1="114" x2="185" y2="184" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-ttr" x1="220" y1="114" x2="255" y2="184" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-rre" x1="350" y1="114" x2="350" y2="184" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-bilf" x1="50" y1="184" x2="50" y2="254" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-bacf" x1="130" y1="184" x2="130" y2="254" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-tech" x1="185" y1="184" x2="185" y2="254" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-tref" x1="255" y1="184" x2="255" y2="254" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <line id="e-reff" x1="350" y1="184" x2="350" y2="254" stroke="#2A2A3A" stroke-width="1.2" class="tedge"/>
+          <text x="50" y="295" text-anchor="middle" font-size="9" fill="#6C63FF" font-family="'JetBrains Mono',monospace">→ Billing</text>
+          <text x="130" y="295" text-anchor="middle" font-size="9" fill="#FFB347" font-family="'JetBrains Mono',monospace">→ Account</text>
+          <text x="185" y="295" text-anchor="middle" font-size="9" fill="#00D4A4" font-family="'JetBrains Mono',monospace">→ Support</text>
+          <text x="255" y="295" text-anchor="middle" font-size="9" fill="#FF6B9D" font-family="'JetBrains Mono',monospace">→ Refund</text>
+          <text x="350" y="295" text-anchor="middle" font-size="9" fill="#FF6B9D" font-family="'JetBrains Mono',monospace">→ Refund</text>
+          <g class="tnode" id="tn-root"><circle cx="220" cy="30" r="18" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.5"/><text x="220" y="30" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#8080A0" font-family="'JetBrains Mono',monospace">root</text></g>
+          <g class="tnode" id="tn-b"><circle cx="90" cy="114" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="90" y="114" text-anchor="middle" dominant-baseline="central" font-size="13" fill="#8080A0" font-family="'JetBrains Mono',monospace">b</text></g>
+          <g class="tnode" id="tn-t"><circle cx="220" cy="114" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="220" y="114" text-anchor="middle" dominant-baseline="central" font-size="13" fill="#8080A0" font-family="'JetBrains Mono',monospace">t</text></g>
+          <g class="tnode" id="tn-r"><circle cx="350" cy="114" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="350" y="114" text-anchor="middle" dominant-baseline="central" font-size="13" fill="#8080A0" font-family="'JetBrains Mono',monospace">r</text></g>
+          <g class="tnode" id="tn-bi"><circle cx="50" cy="184" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="50" y="184" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#8080A0" font-family="'JetBrains Mono',monospace">bi</text></g>
+          <g class="tnode" id="tn-ba"><circle cx="130" cy="184" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="130" y="184" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#8080A0" font-family="'JetBrains Mono',monospace">ba</text></g>
+          <g class="tnode" id="tn-te"><circle cx="185" cy="184" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="185" y="184" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#8080A0" font-family="'JetBrains Mono',monospace">te</text></g>
+          <g class="tnode" id="tn-tr"><circle cx="255" cy="184" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="255" y="184" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#8080A0" font-family="'JetBrains Mono',monospace">tr</text></g>
+          <g class="tnode" id="tn-re"><circle cx="350" cy="184" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="350" y="184" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#8080A0" font-family="'JetBrains Mono',monospace">re</text></g>
+          <g class="tnode" id="tn-bil"><circle cx="50" cy="254" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="50" y="254" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8080A0" font-family="'JetBrains Mono',monospace">bil</text></g>
+          <g class="tnode" id="tn-ba2"><circle cx="130" cy="254" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="130" y="254" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8080A0" font-family="'JetBrains Mono',monospace">bac</text></g>
+          <g class="tnode" id="tn-tech"><circle cx="185" cy="254" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="185" y="254" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">tech</text></g>
+          <g class="tnode" id="tn-tref"><circle cx="255" cy="254" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="255" y="254" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">tref</text></g>
+          <g class="tnode" id="tn-ref"><circle cx="350" cy="254" r="16" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/><text x="350" y="254" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8080A0" font-family="'JetBrains Mono',monospace">ref</text></g>
+        </svg>
+        <div style="padding:0 16px 16px">
+          <div style="font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Traversal trace</div>
+          <div class="trace-box" id="trie-trace">Type a prefix to walk the tree…</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="code-block">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · Trie detection</div></div>
+        <div class="code-body"><pre><span class="hl-kw">class</span> <span class="hl-cl">TrieNode</span>:
+    <span class="hl-kw">def</span> <span class="hl-fn">__init__</span>(self):
+        self.children = {}
+        self.intent = <span class="hl-kw">None</span>
+
+<span class="hl-kw">class</span> <span class="hl-cl">IntentTrie</span>:
+    <span class="hl-kw">def</span> <span class="hl-fn">__init__</span>(self):
+        self.root = <span class="hl-cl">TrieNode</span>()
+
+    <span class="hl-kw">def</span> <span class="hl-fn">insert</span>(self, keyword, intent):
+        node = self.root
+        <span class="hl-kw">for</span> char <span class="hl-kw">in</span> keyword:
+            node = node.children.<span class="hl-fn">setdefault</span>(
+                char, <span class="hl-cl">TrieNode</span>())
+        node.intent = intent
+
+    <span class="hl-kw">def</span> <span class="hl-fn">scan</span>(self, text):
+        <span class="hl-kw">for</span> start <span class="hl-kw">in</span> <span class="hl-fn">range</span>(<span class="hl-fn">len</span>(text)):
+            node = self.root
+            <span class="hl-kw">for</span> ch <span class="hl-kw">in</span> text[start:]:
+                <span class="hl-kw">if</span> ch <span class="hl-kw">not in</span> node.children:
+                    <span class="hl-kw">break</span>
+                node = node.children[ch]
+                <span class="hl-kw">if</span> node.intent:
+                    <span class="hl-kw">return</span> node.intent
+        <span class="hl-kw">return</span> <span class="hl-st">"default"</span>
+
+<span class="hl-cm"># Full pipeline</span>
+trie = <span class="hl-cl">IntentTrie</span>()
+trie.<span class="hl-fn">insert</span>(<span class="hl-st">"billing"</span>, <span class="hl-st">"billing"</span>)
+trie.<span class="hl-fn">insert</span>(<span class="hl-st">"tech"</span>,    <span class="hl-st">"tech"</span>)
+trie.<span class="hl-fn">insert</span>(<span class="hl-st">"refund"</span>,  <span class="hl-st">"refund"</span>)
+
+intent = trie.<span class="hl-fn">scan</span>(user_input)
+agent  = router[intent]
+agent.<span class="hl-fn">handle</span>(user_input)</pre></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- COMPARE -->
+<section id="compare">
+  <div class="section-label">Comparison</div>
+  <div class="section-title">Which router to use?</div>
+  <p class="section-sub">The hash map is always present. The question is what feeds it — a trie scan, a regex, or an LLM.</p>
+  <div class="compare-grid">
+    <div class="cmp-card hashmap">
+      <div class="cmp-name">Hash map only</div>
+      <div class="cmp-complexity">for keyword in keys → O(1) dispatch</div>
+      <ul class="cmp-list">
+        <li><span class="pro-icon">✓</span>Trivial to implement</li>
+        <li><span class="pro-icon">✓</span>Fast enough for &lt;20 intents</li>
+        <li><span class="con-icon">✗</span>O(k) keyword scan is sequential</li>
+        <li><span class="con-icon">✗</span>No prefix sharing</li>
+      </ul>
+    </div>
+    <div class="cmp-card trie">
+      <div class="cmp-name">Trie + Hash map</div>
+      <div class="cmp-complexity">O(L) scan → O(1) dispatch</div>
+      <ul class="cmp-list">
+        <li><span class="pro-icon">✓</span>Efficient for large keyword sets</li>
+        <li><span class="pro-icon">✓</span>Shared prefix paths</li>
+        <li><span class="pro-icon">✓</span>Early exit on mismatch</li>
+        <li><span class="con-icon">✗</span>More code to maintain</li>
+      </ul>
+    </div>
+    <div class="cmp-card llm">
+      <div class="cmp-name">LLM + Hash map</div>
+      <div class="cmp-complexity">O(tokens) classify → O(1) dispatch</div>
+      <ul class="cmp-list">
+        <li><span class="pro-icon">✓</span>Handles paraphrases</li>
+        <li><span class="pro-icon">✓</span>No keyword maintenance</li>
+        <li><span class="con-icon">✗</span>100× slower than trie</li>
+        <li><span class="con-icon">✗</span>Costly at scale</li>
+      </ul>
+    </div>
+  </div>
+  <table class="cplx-table" style="margin-top:40px">
+    <thead><tr><th>Approach</th><th>Detection</th><th>Dispatch</th><th>Best for</th></tr></thead>
+    <tbody>
+      <tr><td>Hash map only</td><td><span class="mono-badge">O(k)</span></td><td><span class="mono-badge">O(1)</span></td><td>Small fixed intent sets (&lt;20)</td></tr>
+      <tr><td>Trie + Hash map</td><td><span class="mono-badge">O(L)</span></td><td><span class="mono-badge">O(1)</span></td><td>Many overlapping keyword prefixes</td></tr>
+      <tr><td>Regex + Hash map</td><td><span class="mono-badge">O(n)</span></td><td><span class="mono-badge">O(1)</span></td><td>Complex pattern matching</td></tr>
+      <tr><td>LLM + Hash map</td><td><span class="mono-badge">O(tokens)</span></td><td><span class="mono-badge">O(1)</span></td><td>Open-domain, semantic routing</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+
+<div class="topic-nav">
+  <a href="../index.html" class="topic-nav-link">
+    <span class="topic-nav-label">← Back to hub</span>
+    <span class="topic-nav-title">All 8 topics</span>
+  </a>
+  <a href="../session-memory/" class="topic-nav-link next">
+    <span class="topic-nav-label">Next →</span>
+    <span class="topic-nav-title">02 · Session Memory</span>
+  </a>
+</div>
+
+<footer>
+  DSA × AI · <a href="../index.html">All topics</a> · Stage 01 of 08 — Intent Routing
+</footer>
+
+<script>
+const hmRouter={billing:['billing','charge','invoice','payment','fee','cost','price','bill'],tech:['tech','wifi','internet','error','bug','crash','broken','not working','slow','issue'],refund:['refund','return','money back','cancel','dispute','chargeback'],account:['account','password','login','sign in','username','profile','reset','forgot']};
+const agentNames={billing:'BillingAgent',tech:'SupportAgent',refund:'RefundAgent',account:'AccountAgent',fallback:'FallbackAgent'};
+const agentColors={billing:'#9B8FFF',tech:'#00D4A4',refund:'#FF6B9D',account:'#FFB347',fallback:'#505068'};
+function setHM(v){document.getElementById('hm-input').value=v;routeHash(v)}
+function routeHash(text){
+  const t=text.toLowerCase();let matched=null;
+  for(const[k,kws]of Object.entries(hmRouter)){if(kws.some(kw=>t.includes(kw))){matched=k;break}}
+  ['billing','tech','refund','account','default'].forEach(id=>{const r=document.getElementById('hr-'+id);if(r)r.classList.remove('lit')});
+  if(matched){const r=document.getElementById('hr-'+matched);if(r)r.classList.add('lit')}
+  const res=document.getElementById('hm-result');const tm=document.getElementById('hm-time');
+  const key=matched||'fallback';res.textContent=agentNames[key];res.style.color=agentColors[key];
+  tm.style.display=text.length>0?'inline-flex':'none';
+}
+const trieNM={'b':'tn-b','t':'tn-t','r':'tn-r','bi':'tn-bi','ba':'tn-ba','te':'tn-te','tr':'tn-tr','re':'tn-re','bil':'tn-bil','bac':'tn-ba2','tec':'tn-tech','tre':'tn-tref','ref':'tn-ref','bill':'tn-bil','tech':'tn-tech','tref':'tn-tref'};
+const edgeM={'b':'e-rb','t':'e-rt','r':'e-rr','bi':'e-bbi','ba':'e-bba','te':'e-tte','tr':'e-ttr','re':'e-rre','bil':'e-bilf','bac':'e-bacf','tec':'e-tech','tre':'e-tref','ref':'e-reff','bill':'e-bilf','tech':'e-tech','tref':'e-tref'};
+const terminals={bill:'billing',billing:'billing',te:'tech',tech:'tech',refund:'refund',ref:'refund',account:'account'};
+const termNodes={billing:'tn-bil',tech:'tn-tech',refund:'tn-ref',account:'tn-ba2'};
+function setTrie(v){document.getElementById('trie-input').value=v;walkTrie(v)}
+function walkTrie(text){
+  document.querySelectorAll('.tnode').forEach(n=>n.classList.remove('active','matched'));
+  document.querySelectorAll('.tedge').forEach(e=>e.classList.remove('active'));
+  const trace=document.getElementById('trie-trace');
+  const t=text.toLowerCase().replace(/[^a-z]/g,'');
+  if(!t){trace.innerHTML='Type a prefix to walk the tree…';return}
+  document.getElementById('tn-root').classList.add('active');
+  const steps=[];
+  for(let i=1;i<=Math.min(t.length,4);i++){
+    const pfx=t.slice(0,i);const nk=pfx.length<=2?pfx:pfx.slice(0,Math.min(pfx.length,4));
+    const nodeId=trieNM[nk];const edgeId=edgeM[nk];
+    if(nodeId){const ne=document.getElementById(nodeId);const ee=document.getElementById(edgeId);if(ne)ne.classList.add('active');if(ee)ee.classList.add('active');steps.push('<span class="trace-step">→['+pfx+']</span>');}
+    else{steps.push('<span class="trace-miss">✗ no "'+t[i-1]+'"</span>');break}
+  }
+  let matched=null;
+  for(const[kw,cat]of Object.entries(terminals)){if(t===kw||t.startsWith(kw)){matched=cat;break}}
+  if(matched&&termNodes[matched]){const mn=document.getElementById(termNodes[matched]);if(mn){mn.classList.remove('active');mn.classList.add('matched')}}
+  trace.innerHTML='<span style="color:var(--dim)">root</span> '+steps.join(' ')+(matched?' <span class="trace-match">→ '+agentNames[matched]+'</span>':'<span class="trace-miss"> → fallback</span>');
+}
+const mTrieNM={'b':'mn-b','t':'mn-t','r':'mn-r','bi':'mn-bi','ba':'mn-ba','te':'mn-te','tr':'mn-tr','re':'mn-re','bil':'mn-bil','bac':'mn-bac','tec':'mn-tech','tre':'mn-tref','ref':'mn-ref','bill':'mn-bil','tech':'mn-tech','tref':'mn-tref'};
+const mEdgeM={'b':'me-rb','t':'me-rt','r':'me-rr','bi':'me-bbi','ba':'me-bba','te':'me-tte','tr':'me-ttr','re':'me-rre','bil':'me-bil','bac':'me-bac','tec':'me-tec','tre':'me-tre','ref':'me-ref','bill':'me-bil','tech':'me-tec','tref':'me-tre'};
+function clearMiniTrie(){document.querySelectorAll('.mtnode').forEach(n=>n.classList.remove('active','matched'));document.querySelectorAll('.mtedge').forEach(e=>e.classList.remove('active'));}
+function animateMiniTrie(keyword,intentCat,cb){
+  clearMiniTrie();const root=document.getElementById('mn-root');if(root)root.classList.add('active');
+  const steps=[];
+  for(let i=1;i<=Math.min(keyword.length,4);i++){const pfx=keyword.slice(0,i);const nk=pfx.length<=2?pfx:pfx.slice(0,Math.min(pfx.length,4));steps.push({nodeId:mTrieNM[nk],edgeId:mEdgeM[nk],pfx});}
+  let si=0;const mTermNodes={billing:'mn-bil',tech:'mn-tech',refund:'mn-ref',account:'mn-bac'};
+  function doStep(){
+    if(si>=steps.length){
+      if(intentCat&&mTermNodes[intentCat]){const mn=document.getElementById(mTermNodes[intentCat]);if(mn){mn.classList.remove('active');mn.classList.add('matched')}}
+      document.getElementById('mini-trie-status').textContent=intentCat?'✓ Found: "'+intentCat+'"':'✗ No match → fallback';
+      document.getElementById('mini-trie-status').style.color=intentCat?'#00D4A4':'#FF6B9D';
+      if(cb)setTimeout(cb,600);return;
+    }
+    const s=steps[si++];
+    if(s.nodeId){const ne=document.getElementById(s.nodeId);const ee=document.getElementById(s.edgeId);if(ne)ne.classList.add('active');if(ee)ee.classList.add('active')}
+    setTimeout(doStep,420);
+  }
+  setTimeout(doStep,300);
+}
+const pipeQueries={'I have a billing issue with my invoice':{keyword:'billing',intent:'billing'},'my wifi is not working at all':{keyword:'tech',intent:'tech'},'I want to refund my order please':{keyword:'refund',intent:'refund'},'how do I reset my account password':{keyword:'account',intent:'account'},'what time does the store open':{keyword:null,intent:null}};
+let pipeRunning=false;
+function delay(ms){return new Promise(r=>setTimeout(r,ms))}
+function setPacket(pct){const dot=document.getElementById('packet-dot');const fill=document.getElementById('packet-fill');if(dot)dot.style.left='calc('+pct+'% - 10px)';if(fill)fill.style.width=pct+'%';}
+function addLog(html){const log=document.getElementById('step-log');const line=document.createElement('div');line.className='log-line';line.innerHTML=html;log.innerHTML='';log.appendChild(line);requestAnimationFrame(()=>line.classList.add('show'));}
+function highlightPipeNode(nodeId,active){const box=document.getElementById('pb-'+nodeId);if(!box)return;if(active){box.style.boxShadow='0 0 20px rgba(108,99,255,.5)';box.style.transform='translateY(-3px)'}else{box.style.boxShadow='';box.style.transform=''}}
+function highlightMiniHash(intent){['billing','tech','refund','account','default'].forEach(id=>{const r=document.getElementById('mhr-'+id);if(r)r.classList.remove('lit');});if(intent){const r=document.getElementById('mhr-'+intent);if(r)r.classList.add('lit')}}
+function setStatus(txt,color){const s=document.getElementById('pipe-status');s.textContent=txt;s.style.background=color+'22';s.style.color=color;s.style.border='1px solid '+color+'44';}
+async function runPipeline(){
+  if(pipeRunning)return;pipeRunning=true;const btn=document.getElementById('btn-run');btn.disabled=true;resetPipelineVisuals();
+  const queryEl=document.getElementById('pipe-query');const query=queryEl.value;const info=pipeQueries[query];
+  const keyword=info?info.keyword:null;const intent=info?info.intent:null;
+  document.getElementById('mini-hash-status').textContent='Waiting for trie output…';document.getElementById('mini-hash-status').style.color='var(--dim)';
+  document.getElementById('mini-trie-status').textContent='Scanning text…';document.getElementById('mini-trie-status').style.color='var(--muted)';
+  setStatus('running…','#6C63FF');setPacket(0);highlightPipeNode('user',true);
+  addLog('<span class="log-dim">→</span> <span class="log-accent">User input received</span>: <span style="color:var(--text)">"'+query+'"</span>');
+  await delay(900);highlightPipeNode('user',false);setPacket(20);highlightPipeNode('trie',true);
+  addLog('<span class="log-dim">→</span> <span class="log-teal">Trie scanning</span> text for intent keywords…');setStatus('trie scanning','#00D4A4');await delay(600);
+  await new Promise(resolve=>{if(keyword){animateMiniTrie(keyword,intent,resolve);}else{document.getElementById('mini-trie-status').textContent='✗ No keyword found → fallback';document.getElementById('mini-trie-status').style.color='#FF6B9D';setTimeout(resolve,1200);}});
+  await delay(400);highlightPipeNode('trie',false);setPacket(50);highlightPipeNode('hash',true);setStatus('hash lookup','#FFB347');
+  if(intent){addLog('<span class="log-dim">→</span> <span class="log-teal">Trie output</span>: <span class="log-accent">"'+intent+'"</span> <span class="log-dim">→ hash map lookup</span>');}
+  else{addLog('<span class="log-dim">→</span> <span class="log-pink">No intent found</span> <span class="log-dim">→ routing to FallbackAgent</span>');}
+  await delay(500);highlightMiniHash(intent||'default');
+  const agentKey=intent||'fallback';
+  document.getElementById('mini-hash-status').textContent='✓ Dispatching to '+agentNames[agentKey];document.getElementById('mini-hash-status').style.color=agentColors[agentKey];
+  await delay(700);highlightPipeNode('hash',false);setPacket(100);highlightPipeNode('agent',true);setStatus('dispatched','#5BDB85');
+  addLog('<span class="log-dim">→</span> <span class="log-green">Dispatched</span>: <span style="color:'+agentColors[agentKey]+'">'+agentNames[agentKey]+'</span> <span class="log-dim">is handling the query</span>');
+  await delay(1200);highlightPipeNode('agent',false);setStatus('done ✓','#5BDB85');pipeRunning=false;btn.disabled=false;
+}
+function resetPipelineVisuals(){setPacket(0);clearMiniTrie();['billing','tech','refund','account','default'].forEach(id=>{const r=document.getElementById('mhr-'+id);if(r)r.classList.remove('lit');});['user','trie','hash','agent'].forEach(id=>highlightPipeNode(id,false));document.getElementById('step-log').innerHTML='<div style="color:var(--dim)">Choose a query below and press Run to trace the full pipeline…</div>';document.getElementById('mini-trie-status').textContent='Waiting…';document.getElementById('mini-trie-status').style.color='var(--dim)';document.getElementById('mini-hash-status').textContent='Waiting for trie output…';document.getElementById('mini-hash-status').style.color='var(--dim)';setStatus('idle','#505068');}
+function resetPipeline(){if(pipeRunning)return;resetPipelineVisuals();}
+</script>
+</body>
+</html>

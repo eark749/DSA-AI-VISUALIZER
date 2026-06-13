@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DSA × AI — Data Structures Powering Modern AI Agents</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="./shared.css"/>
+<style>
+/* HUB-SPECIFIC STYLES */
+.hero-cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+/* FILTER BAR */
+.filter-bar {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  justify-content: center; margin-bottom: 48px;
+}
+.filter-chip {
+  padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); color: var(--muted);
+  background: transparent; font-family: var(--font);
+  transition: all .2s; letter-spacing: .04em;
+}
+.filter-chip:hover { border-color: var(--border2); color: var(--text); }
+.filter-chip.active { background: var(--accent); color: #fff; border-color: transparent; }
+
+/* CARD GRID */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+.topic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color .25s, transform .25s;
+  display: flex; flex-direction: column;
+  text-decoration: none; color: inherit;
+  position: relative;
+}
+.topic-card:hover {
+  border-color: var(--border2);
+  transform: translateY(-3px);
+}
+.card-accent-bar { height: 3px; width: 100%; }
+.card-body { padding: 24px; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.card-top { display: flex; align-items: center; justify-content: space-between; }
+.card-stage {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim); font-family: var(--mono);
+}
+.card-category {
+  font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; padding: 3px 9px; border-radius: 10px;
+  border: 1px solid;
+}
+.card-title { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.card-ds { display: flex; gap: 6px; flex-wrap: wrap; }
+.card-desc { font-size: 13px; color: var(--muted); line-height: 1.65; flex: 1; }
+.card-meta {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 14px; border-top: 1px solid var(--border);
+}
+.card-complexity { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+.card-cta {
+  font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  display: flex; align-items: center; gap: 5px;
+}
+
+/* MINI PREVIEW ANIMATIONS */
+.card-preview {
+  height: 80px; background: var(--bg3);
+  border-radius: 10px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+/* Trie animation */
+.preview-trie { gap: 0; }
+.ptrie-node {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface2); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  position: absolute; transition: all .4s;
+}
+/* Deque animation */
+.preview-deque { padding: 0 16px; gap: 4px; }
+.pdeque-item {
+  height: 36px; border-radius: 6px; font-family: var(--mono);
+  font-size: 10px; display: flex; align-items: center; padding: 0 10px;
+  white-space: nowrap; border: 1px solid;
+  animation: deque-flow 3s ease-in-out infinite;
+}
+@keyframes deque-flow {
+  0%,100% { opacity: .5; }
+  50% { opacity: 1; }
+}
+/* DAG animation */
+.preview-dag svg { width: 100%; height: 100%; }
+/* Pulse dot */
+.pulse-ring {
+  position: absolute; border-radius: 50%;
+  border: 2px solid; animation: ring-out 2s ease-out infinite;
+}
+@keyframes ring-out {
+  0% { transform: scale(1); opacity: .8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+/* Heap animation */
+.preview-heap { position: relative; }
+
+/* STATS BAR */
+.stats-bar {
+  background: var(--bg2); border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 32px 40px;
+}
+.stats-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 24px;
+}
+.stat { text-align: center; }
+.stat-num { font-size: 36px; font-weight: 700; font-family: var(--mono); margin-bottom: 4px; }
+.stat-label { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+
+/* PIPELINE STRIP */
+.pipeline-strip {
+  max-width: 1100px; margin: 0 auto;
+  padding: 60px 40px 0;
+}
+.pipeline-row {
+  display: flex; align-items: center; overflow-x: auto;
+  gap: 0; padding: 10px 0 24px;
+}
+.ps-node {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; min-width: 100px;
+}
+.ps-box {
+  padding: 10px 16px; border-radius: 10px; border: 1px solid;
+  font-size: 11px; font-weight: 600; text-align: center; white-space: nowrap;
+  transition: all .3s; cursor: default;
+}
+.ps-label { font-size: 9px; color: var(--dim); letter-spacing: .05em; text-transform: uppercase; }
+.ps-arrow { width: 32px; height: 2px; background: var(--border2); position: relative; flex-shrink: 0; }
+.ps-arrow::after {
+  content: ''; position: absolute; right: 0; top: -4px;
+  border-left: 7px solid var(--border2);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+}
+
+@media (max-width: 900px) {
+  .card-grid { grid-template-columns: 1fr; }
+  .stats-inner { grid-template-columns: repeat(2,1fr); }
+  .pipeline-row { justify-content: flex-start; }
+  .filter-bar { gap: 6px; }
+}
+@media (max-width: 600px) {
+  .stats-inner { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stats-bar { padding: 24px 20px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="./index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="./intent-routing/" class="nav-stage" style="background:rgba(108,99,255,.15);color:#9B8FFF;border-color:rgba(108,99,255,.3)">01 Routing</a>
+    <a href="./session-memory/" class="nav-stage" style="background:rgba(0,212,164,.08);color:#00D4A4;border-color:rgba(0,212,164,.2)">02 Memory</a>
+    <a href="./orchestration/" class="nav-stage" style="background:rgba(91,143,255,.08);color:#5B8FFF;border-color:rgba(91,143,255,.2)">03 DAG</a>
+    <a href="./retrieval/" class="nav-stage" style="background:rgba(255,107,157,.08);color:#FF6B9D;border-color:rgba(255,107,157,.2)">04 Search</a>
+    <a href="./scheduling/" class="nav-stage" style="background:rgba(255,179,71,.08);color:#FFB347;border-color:rgba(255,179,71,.2)">05 Queue</a>
+    <a href="./async-tracking/" class="nav-stage" style="background:rgba(91,219,133,.08);color:#5BDB85;border-color:rgba(91,219,133,.2)">06 Async</a>
+    <a href="./guardrails/" class="nav-stage" style="background:rgba(255,82,82,.08);color:#FF5252;border-color:rgba(255,82,82,.2)">07 Guard</a>
+    <a href="./streaming/" class="nav-stage" style="background:rgba(167,139,250,.08);color:#A78BFA;border-color:rgba(167,139,250,.2)">08 Stream</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="eyebrow"><span class="eyebrow-dot"></span>AI Agent Pipelines</div>
+  <h1>The <em style="color:#9B8FFF">data structures</em> powering<br/>every modern AI agent</h1>
+  <p class="hero-sub">8 stages. 8 classic algorithms. Every AI agent — from chatbots to autonomous agents — runs on these exact patterns.</p>
+  <div class="hero-cta">
+    <a href="#topics" class="btn-primary">Explore all 8 topics</a>
+    <a href="./intent-routing/" class="btn-secondary">Start with routing →</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<!-- PIPELINE STRIP -->
+<div class="full-bg">
+  <div class="pipeline-strip">
+    <div class="section-label">End-to-end pipeline</div>
+    <div class="section-title">From user input to response</div>
+    <div class="pipeline-row">
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(108,99,255,.1);border-color:rgba(108,99,255,.3);color:#9B8FFF">01 Route</div>
+        <div class="ps-label">Trie + HashMap</div>
+      </div>
+      <div class="ps-arrow"></div>
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(0,212,164,.08);border-color:rgba(0,212,164,.2);color:#00D4A4">02 Memory</div>
+        <div class="ps-label">Deque + LRU</div>
+      </div>
+      <div class="ps-arrow"></div>
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(91,143,255,.08);border-color:rgba(91,143,255,.2);color:#5B8FFF">03 Orchestrate</div>
+        <div class="ps-label">DAG</div>
+      </div>
+      <div class="ps-arrow"></div>
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(255,107,157,.08);border-color:rgba(255,107,157,.2);color:#FF6B9D">04 Retrieve</div>
+        <div class="ps-label">HNSW + Index</div>
+      </div>
+      <div class="ps-arrow"></div>
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(255,179,71,.08);border-color:rgba(255,179,71,.2);color:#FFB347">05 Schedule</div>
+        <div class="ps-label">Priority Queue</div>
+      </div>
+      <div class="ps-arrow"></div>
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(91,219,133,.08);border-color:rgba(91,219,133,.2);color:#5BDB85">06 Execute</div>
+        <div class="ps-label">HashMap+Futures</div>
+      </div>
+      <div class="ps-arrow"></div>
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(255,82,82,.08);border-color:rgba(255,82,82,.2);color:#FF5252">07 Guard</div>
+        <div class="ps-label">Aho-Corasick</div>
+      </div>
+      <div class="ps-arrow"></div>
+      <div class="ps-node">
+        <div class="ps-box" style="background:rgba(167,139,250,.08);border-color:rgba(167,139,250,.2);color:#A78BFA">08 Stream</div>
+        <div class="ps-label">Buffer + AST</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat">
+      <div class="stat-num" style="color:#9B8FFF">8</div>
+      <div class="stat-label">Pipeline stages</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" style="color:#00D4A4">12+</div>
+      <div class="stat-label">Data structures</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" style="color:#FFB347">O(1)</div>
+      <div class="stat-label">Routing complexity</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" style="color:#FF6B9D">O(log N)</div>
+      <div class="stat-label">Vector search</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- TOPICS GRID -->
+<section id="topics" style="max-width:1100px">
+  <div class="section-label">All topics</div>
+  <div class="section-title">8 stages of the AI agent pipeline</div>
+  <p class="section-sub">Each stage is a self-contained interactive visualization — live animation, runnable code, and complexity breakdown.</p>
+
+  <div class="filter-bar">
+    <button class="filter-chip active" onclick="filterCards('all',this)">All</button>
+    <button class="filter-chip" onclick="filterCards('routing',this)">Routing</button>
+    <button class="filter-chip" onclick="filterCards('memory',this)">Memory</button>
+    <button class="filter-chip" onclick="filterCards('search',this)">Search</button>
+    <button class="filter-chip" onclick="filterCards('execution',this)">Execution</button>
+    <button class="filter-chip" onclick="filterCards('safety',this)">Safety</button>
+  </div>
+
+  <div class="card-grid" id="card-grid">
+
+    <!-- 01 Intent Routing -->
+    <a href="./intent-routing/" class="topic-card" data-cat="routing">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#6C63FF,#9B8FFF)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 01</span>
+          <span class="card-category" style="background:rgba(108,99,255,.12);color:#9B8FFF;border-color:rgba(108,99,255,.25)">Routing</span>
+        </div>
+        <div class="card-title">Intent Routing</div>
+        <div class="card-ds">
+          <span class="chip chip-purple" style="cursor:default">Trie</span>
+          <span class="chip chip-purple" style="cursor:default">HashMap</span>
+        </div>
+        <!-- Mini trie preview -->
+        <div class="card-preview">
+          <svg viewBox="0 0 200 75" width="200" height="75">
+            <line x1="100" y1="12" x2="50" y2="38" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="100" y1="12" x2="100" y2="38" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="100" y1="12" x2="150" y2="38" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="50" y1="38" x2="30" y2="62" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="50" y1="38" x2="70" y2="62" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="100" y1="38" x2="100" y2="62" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line id="hl-e" x1="100" y1="12" x2="50" y2="38" stroke="#6C63FF" stroke-width="2" opacity="0">
+              <animate attributeName="opacity" values="0;1;1;0" dur="3s" repeatCount="indefinite" begin="0s"/>
+            </line>
+            <circle id="hl-n1" cx="100" cy="12" r="10" fill="#1C1C28" stroke="#6C63FF" stroke-width="1.5">
+              <animate attributeName="stroke" values="#2A2A3A;#6C63FF;#6C63FF;#2A2A3A" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <text x="100" y="12" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="monospace">root</text>
+            <circle cx="50" cy="38" r="9" fill="#1C1C28" stroke="#6C63FF" stroke-width="1.5">
+              <animate attributeName="stroke" values="#2A2A3A;#2A2A3A;#6C63FF;#2A2A3A" dur="3s" repeatCount="indefinite" begin="0.8s"/>
+            </circle>
+            <text x="50" y="38" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8080A0" font-family="monospace">b</text>
+            <circle cx="100" cy="38" r="9" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="100" y="38" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8080A0" font-family="monospace">t</text>
+            <circle cx="150" cy="38" r="9" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="150" y="38" text-anchor="middle" dominant-baseline="central" font-size="9" fill="#8080A0" font-family="monospace">r</text>
+            <circle cx="30" cy="62" r="9" fill="#2D1F5E" stroke="#6C63FF" stroke-width="2">
+              <animate attributeName="fill" values="#1C1C28;#1C1C28;#2D1F5E;#1C1C28" dur="3s" repeatCount="indefinite" begin="1.6s"/>
+            </circle>
+            <text x="30" y="62" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#9B8FFF" font-family="monospace">bil</text>
+            <circle cx="70" cy="62" r="9" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="70" y="62" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="monospace">bac</text>
+            <circle cx="100" cy="62" r="9" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="100" y="62" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="monospace">tec</text>
+          </svg>
+        </div>
+        <p class="card-desc">Trie scans raw text O(L) to detect intent keyword. Hash map dispatches to the right agent O(1). Used in every multi-agent AI framework.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(L) + O(1)</span>
+          <span class="card-cta" style="color:#9B8FFF">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 02 Session Memory -->
+    <a href="./session-memory/" class="topic-card" data-cat="memory">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#00D4A4,#00FFB3)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 02</span>
+          <span class="card-category" style="background:rgba(0,212,164,.1);color:#00D4A4;border-color:rgba(0,212,164,.25)">Memory</span>
+        </div>
+        <div class="card-title">Session Memory</div>
+        <div class="card-ds">
+          <span class="chip chip-teal" style="cursor:default">Deque</span>
+          <span class="chip chip-teal" style="cursor:default">LRU Cache</span>
+        </div>
+        <!-- Deque preview -->
+        <div class="card-preview" style="padding:0 12px;">
+          <svg viewBox="0 0 240 70" width="240" height="70">
+            <rect x="2" y="20" width="46" height="30" rx="5" fill="rgba(0,212,164,0.06)" stroke="rgba(0,212,164,0.2)" stroke-width="1"/>
+            <text x="25" y="35" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#505068" font-family="monospace">msg -3</text>
+            <rect x="52" y="20" width="46" height="30" rx="5" fill="rgba(0,212,164,0.08)" stroke="rgba(0,212,164,0.25)" stroke-width="1"/>
+            <text x="75" y="35" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="monospace">msg -2</text>
+            <rect x="102" y="15" width="46" height="40" rx="5" fill="rgba(0,212,164,0.12)" stroke="rgba(0,212,164,0.35)" stroke-width="1.5"/>
+            <text x="125" y="35" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#00D4A4" font-family="monospace">msg -1</text>
+            <rect x="152" y="10" width="46" height="50" rx="5" fill="rgba(0,212,164,0.18)" stroke="#00D4A4" stroke-width="2"/>
+            <text x="175" y="35" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#00FFB3" font-family="monospace">latest</text>
+            <text x="210" y="35" text-anchor="middle" dominant-baseline="central" font-size="18" fill="rgba(0,212,164,0.5)">+</text>
+            <text x="8" y="62" font-size="8" fill="#505068" font-family="monospace">← popleft (evict old)</text>
+            <text x="180" y="62" text-anchor="end" font-size="8" fill="#505068" font-family="monospace">append →</text>
+          </svg>
+        </div>
+        <p class="card-desc">Deque maintains rolling window of conversation turns — O(1) append/pop. LRU cache evicts idle sessions. Exactly how OpenAI's Agents SDK TrimmingSession works.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(1) enqueue/dequeue</span>
+          <span class="card-cta" style="color:#00D4A4">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 03 Orchestration -->
+    <a href="./orchestration/" class="topic-card" data-cat="execution">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#5B8FFF,#7AA3FF)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 03</span>
+          <span class="card-category" style="background:rgba(91,143,255,.1);color:#5B8FFF;border-color:rgba(91,143,255,.25)">Execution</span>
+        </div>
+        <div class="card-title">Orchestration</div>
+        <div class="card-ds">
+          <span class="chip chip-blue" style="cursor:default">DAG</span>
+          <span class="chip chip-blue" style="cursor:default">State Machine</span>
+        </div>
+        <!-- DAG preview -->
+        <div class="card-preview">
+          <svg viewBox="0 0 220 75" width="220" height="75">
+            <line x1="40" y1="37" x2="80" y2="20" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="40" y1="37" x2="80" y2="55" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="92" y1="20" x2="132" y2="20" stroke="#5B8FFF" stroke-width="1.5">
+              <animate attributeName="stroke-dashoffset" from="40" to="0" dur="1.5s" repeatCount="indefinite"/>
+            </line>
+            <line x1="92" y1="55" x2="132" y2="55" stroke="#5B8FFF" stroke-width="1.5">
+              <animate attributeName="stroke-dashoffset" from="40" to="0" dur="1.5s" repeatCount="indefinite" begin="0.4s"/>
+            </line>
+            <line x1="144" y1="20" x2="178" y2="37" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="144" y1="55" x2="178" y2="37" stroke="#2A2A3A" stroke-width="1.2"/>
+            <circle cx="40" cy="37" r="12" fill="rgba(91,143,255,0.15)" stroke="#5B8FFF" stroke-width="1.5"/>
+            <text x="40" y="37" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#5B8FFF" font-family="monospace">start</text>
+            <circle cx="86" cy="20" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2">
+              <animate attributeName="fill" values="#1C1C28;rgba(91,143,255,0.15);#1C1C28" dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="stroke" values="#2A2A3A;#5B8FFF;#2A2A3A" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <text x="86" y="20" text-anchor="middle" dominant-baseline="central" font-size="6.5" fill="#8080A0" font-family="monospace">A</text>
+            <circle cx="86" cy="55" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2">
+              <animate attributeName="fill" values="#1C1C28;rgba(91,143,255,0.15);#1C1C28" dur="2s" repeatCount="indefinite" begin="0.4s"/>
+              <animate attributeName="stroke" values="#2A2A3A;#5B8FFF;#2A2A3A" dur="2s" repeatCount="indefinite" begin="0.4s"/>
+            </circle>
+            <text x="86" y="55" text-anchor="middle" dominant-baseline="central" font-size="6.5" fill="#8080A0" font-family="monospace">B</text>
+            <circle cx="138" cy="20" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="138" y="20" text-anchor="middle" dominant-baseline="central" font-size="6.5" fill="#8080A0" font-family="monospace">C</text>
+            <circle cx="138" cy="55" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="138" y="55" text-anchor="middle" dominant-baseline="central" font-size="6.5" fill="#8080A0" font-family="monospace">D</text>
+            <circle cx="184" cy="37" r="12" fill="rgba(91,219,133,0.12)" stroke="#5BDB85" stroke-width="1.5"/>
+            <text x="184" y="37" text-anchor="middle" dominant-baseline="central" font-size="6.5" fill="#5BDB85" font-family="monospace">done</text>
+          </svg>
+        </div>
+        <p class="card-desc">Directed acyclic graph defines which agents run in sequence vs parallel. Enables topological scheduling, cycle detection, and fault-tolerant multi-agent workflows.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(V+E) traversal</span>
+          <span class="card-cta" style="color:#5B8FFF">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 04 Knowledge Retrieval -->
+    <a href="./retrieval/" class="topic-card" data-cat="search">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#FF6B9D,#FF8CB8)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 04</span>
+          <span class="card-category" style="background:rgba(255,107,157,.1);color:#FF6B9D;border-color:rgba(255,107,157,.25)">Search</span>
+        </div>
+        <div class="card-title">Knowledge Retrieval</div>
+        <div class="card-ds">
+          <span class="chip chip-pink" style="cursor:default">HNSW Graph</span>
+          <span class="chip chip-pink" style="cursor:default">Inverted Index</span>
+        </div>
+        <!-- HNSW preview -->
+        <div class="card-preview">
+          <svg viewBox="0 0 220 75" width="220" height="75">
+            <!-- Layer labels -->
+            <text x="4" y="14" font-size="7" fill="#505068" font-family="monospace">L2</text>
+            <text x="4" y="40" font-size="7" fill="#505068" font-family="monospace">L1</text>
+            <text x="4" y="66" font-size="7" fill="#505068" font-family="monospace">L0</text>
+            <!-- L2 connections -->
+            <line x1="60" y1="12" x2="160" y2="12" stroke="#2A2A3A" stroke-width="1"/>
+            <!-- L1 connections -->
+            <line x1="40" y1="38" x2="90" y2="38" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="90" y1="38" x2="140" y2="38" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="140" y1="38" x2="185" y2="38" stroke="#2A2A3A" stroke-width="1"/>
+            <!-- L0 connections -->
+            <line x1="28" y1="65" x2="60" y2="65" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="60" y1="65" x2="90" y2="65" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="90" y1="65" x2="115" y2="65" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="115" y1="65" x2="145" y2="65" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="145" y1="65" x2="175" y2="65" stroke="#2A2A3A" stroke-width="1"/>
+            <!-- Animated query path -->
+            <line x1="60" y1="12" x2="90" y2="38" stroke="#FF6B9D" stroke-width="1.5" opacity="0.6">
+              <animate attributeName="opacity" values="0;0.8;0.8;0" dur="2.5s" repeatCount="indefinite"/>
+            </line>
+            <line x1="90" y1="38" x2="115" y2="65" stroke="#FF6B9D" stroke-width="1.5" opacity="0.6">
+              <animate attributeName="opacity" values="0;0;0.8;0" dur="2.5s" repeatCount="indefinite"/>
+            </line>
+            <!-- Nodes L2 -->
+            <circle cx="60" cy="12" r="7" fill="rgba(255,107,157,0.15)" stroke="#FF6B9D" stroke-width="1.5"/>
+            <circle cx="160" cy="12" r="7" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <!-- Nodes L1 -->
+            <circle cx="40" cy="38" r="6" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <circle cx="90" cy="38" r="6" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1">
+              <animate attributeName="fill" values="#1C1C28;rgba(255,107,157,0.15);#1C1C28" dur="2.5s" repeatCount="indefinite" begin="0.8s"/>
+              <animate attributeName="stroke" values="#2A2A3A;#FF6B9D;#2A2A3A" dur="2.5s" repeatCount="indefinite" begin="0.8s"/>
+            </circle>
+            <circle cx="140" cy="38" r="6" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <circle cx="185" cy="38" r="6" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <!-- Nodes L0 -->
+            <circle cx="28" cy="65" r="5" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <circle cx="60" cy="65" r="5" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <circle cx="90" cy="65" r="5" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <circle cx="115" cy="65" r="7" fill="rgba(255,107,157,0.2)" stroke="#FF6B9D" stroke-width="2">
+              <animate attributeName="fill" values="rgba(255,107,157,0.05);rgba(255,107,157,0.25);rgba(255,107,157,0.05)" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="145" cy="65" r="5" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <circle cx="175" cy="65" r="5" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+          </svg>
+        </div>
+        <p class="card-desc">HNSW multi-layer graph gives O(log N) approximate nearest-neighbor search. Paired with inverted index for hybrid semantic + keyword retrieval in RAG systems.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(log N) ANN search</span>
+          <span class="card-cta" style="color:#FF6B9D">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 05 Task Scheduling -->
+    <a href="./scheduling/" class="topic-card" data-cat="execution">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#FFB347,#FFC96B)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 05</span>
+          <span class="card-category" style="background:rgba(255,179,71,.1);color:#FFB347;border-color:rgba(255,179,71,.25)">Execution</span>
+        </div>
+        <div class="card-title">Task Scheduling</div>
+        <div class="card-ds">
+          <span class="chip chip-amber" style="cursor:default">Priority Queue</span>
+          <span class="chip chip-amber" style="cursor:default">Min Heap</span>
+        </div>
+        <!-- Heap preview -->
+        <div class="card-preview">
+          <svg viewBox="0 0 200 75" width="200" height="75">
+            <!-- Heap tree -->
+            <line x1="100" y1="16" x2="60" y2="40" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="100" y1="16" x2="140" y2="40" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="60" y1="40" x2="40" y2="62" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="60" y1="40" x2="80" y2="62" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="140" y1="40" x2="120" y2="62" stroke="#2A2A3A" stroke-width="1.2"/>
+            <line x1="140" y1="40" x2="160" y2="62" stroke="#2A2A3A" stroke-width="1.2"/>
+            <!-- Root pops out -->
+            <circle cx="100" cy="16" r="12" fill="rgba(255,179,71,0.2)" stroke="#FFB347" stroke-width="2">
+              <animate attributeName="cy" values="16;-10;16" dur="3s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="1;0;1" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <text x="100" y="16" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#FFB347" font-family="monospace">P:1</text>
+            <circle cx="60" cy="40" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="60" y="40" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="monospace">P:2</text>
+            <circle cx="140" cy="40" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2"/>
+            <text x="140" y="40" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="monospace">P:3</text>
+            <circle cx="40" cy="62" r="8" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <text x="40" y="62" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#505068" font-family="monospace">P:4</text>
+            <circle cx="80" cy="62" r="8" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <text x="80" y="62" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#505068" font-family="monospace">P:5</text>
+            <circle cx="120" cy="62" r="8" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <text x="120" y="62" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#505068" font-family="monospace">P:6</text>
+            <circle cx="160" cy="62" r="8" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1"/>
+            <text x="160" y="62" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#505068" font-family="monospace">P:7</text>
+          </svg>
+        </div>
+        <p class="card-desc">Priority heap ensures user-facing tool calls execute before background jobs. O(log N) push/pop. Used in Temporal task queues to prevent background tasks starving interactive ones.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(log N) push/pop</span>
+          <span class="card-cta" style="color:#FFB347">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 06 Async Tracking -->
+    <a href="./async-tracking/" class="topic-card" data-cat="execution">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#5BDB85,#7AE89B)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 06</span>
+          <span class="card-category" style="background:rgba(91,219,133,.1);color:#5BDB85;border-color:rgba(91,219,133,.25)">Execution</span>
+        </div>
+        <div class="card-title">Async Execution</div>
+        <div class="card-ds">
+          <span class="chip chip-green" style="cursor:default">HashMap</span>
+          <span class="chip chip-green" style="cursor:default">Futures</span>
+        </div>
+        <!-- Async preview -->
+        <div class="card-preview" style="padding:0 10px;gap:4px;flex-direction:column;align-items:flex-start;justify-content:center;">
+          <svg viewBox="0 0 230 70" width="230" height="70">
+            <rect x="2" y="5" width="75" height="18" rx="4" fill="rgba(91,219,133,0.08)" stroke="rgba(91,219,133,0.2)" stroke-width="1"/>
+            <text x="39" y="14" text-anchor="middle" dominant-baseline="central" font-size="7.5" fill="#5BDB85" font-family="monospace">task_a → pending</text>
+            <rect x="2" y="27" width="75" height="18" rx="4" fill="rgba(91,219,133,0.12)" stroke="#5BDB85" stroke-width="1.5"/>
+            <text x="39" y="36" text-anchor="middle" dominant-baseline="central" font-size="7.5" fill="#5BDB85" font-family="monospace">task_b → done ✓</text>
+            <rect x="2" y="49" width="75" height="18" rx="4" fill="rgba(91,219,133,0.06)" stroke="rgba(91,219,133,0.15)" stroke-width="1"/>
+            <text x="39" y="58" text-anchor="middle" dominant-baseline="central" font-size="7.5" fill="#505068" font-family="monospace">task_c → running</text>
+            <!-- Animated result arriving -->
+            <circle cx="170" cy="36" r="18" fill="rgba(91,219,133,0.1)" stroke="#5BDB85" stroke-width="1.5">
+              <animate attributeName="r" values="14;18;14" dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <text x="170" y="36" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#5BDB85" font-family="monospace">result</text>
+            <line x1="80" y1="36" x2="150" y2="36" stroke="#5BDB85" stroke-width="1" stroke-dasharray="4,3">
+              <animate attributeName="stroke-dashoffset" from="28" to="0" dur="1s" repeatCount="indefinite"/>
+            </line>
+          </svg>
+        </div>
+        <p class="card-desc">HashMap maps task_id to in-flight future. Concurrent tool calls fire in parallel, results route back by ID. Pattern used in asyncio, Ray, and every async agent framework.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(1) lookup per task</span>
+          <span class="card-cta" style="color:#5BDB85">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 07 Safety / Guardrails -->
+    <a href="./guardrails/" class="topic-card" data-cat="safety">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#FF5252,#FF7070)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 07</span>
+          <span class="card-category" style="background:rgba(255,82,82,.1);color:#FF5252;border-color:rgba(255,82,82,.25)">Safety</span>
+        </div>
+        <div class="card-title">Safety Guardrails</div>
+        <div class="card-ds">
+          <span class="chip chip-red" style="cursor:default">Aho-Corasick</span>
+          <span class="chip chip-red" style="cursor:default">Trie</span>
+        </div>
+        <!-- Aho-Corasick preview -->
+        <div class="card-preview">
+          <svg viewBox="0 0 220 75" width="220" height="75">
+            <!-- Token stream -->
+            <rect x="2" y="28" width="220" height="20" rx="4" fill="rgba(255,82,82,0.04)" stroke="rgba(255,82,82,0.1)" stroke-width="1"/>
+            <text x="8" y="38" dominant-baseline="central" font-size="8.5" fill="#8080A0" font-family="monospace">The</text>
+            <text x="30" y="38" dominant-baseline="central" font-size="8.5" fill="#8080A0" font-family="monospace">user</text>
+            <text x="58" y="38" dominant-baseline="central" font-size="8.5" fill="#8080A0" font-family="monospace">said</text>
+            <!-- Scanning cursor -->
+            <rect x="84" y="26" width="28" height="24" rx="3" fill="rgba(255,82,82,0.15)" stroke="#FF5252" stroke-width="1.5">
+              <animate attributeName="x" values="84;110;136;160;84" dur="3s" repeatCount="indefinite"/>
+            </rect>
+            <text x="98" y="38" dominant-baseline="central" font-size="8.5" fill="#FF5252" font-family="monospace">
+              <animate attributeName="x" values="98;124;150;174;98" dur="3s" repeatCount="indefinite"/>
+              bad
+            </text>
+            <text x="114" y="38" dominant-baseline="central" font-size="8.5" fill="#8080A0" font-family="monospace">word</text>
+            <text x="144" y="38" dominant-baseline="central" font-size="8.5" fill="#8080A0" font-family="monospace">here</text>
+            <!-- Match indicator -->
+            <text x="110" y="14" text-anchor="middle" font-size="8" fill="#FF5252" font-family="monospace">
+              <animate attributeName="opacity" values="0;0;1;1;0" dur="3s" repeatCount="indefinite"/>
+              ⚠ BLOCKED
+            </text>
+            <line x1="110" y1="18" x2="110" y2="26" stroke="#FF5252" stroke-width="1" opacity="0">
+              <animate attributeName="opacity" values="0;0;1;1;0" dur="3s" repeatCount="indefinite"/>
+            </line>
+          </svg>
+        </div>
+        <p class="card-desc">Aho-Corasick builds a trie + failure links from all banned patterns. Scans token stream in O(m) — catches forbidden phrases mid-sentence as the model streams output.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(m) streaming scan</span>
+          <span class="card-cta" style="color:#FF5252">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+    <!-- 08 Response Streaming -->
+    <a href="./streaming/" class="topic-card" data-cat="memory">
+      <div class="card-accent-bar" style="background:linear-gradient(90deg,#A78BFA,#C4B0FF)"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <span class="card-stage">Stage 08</span>
+          <span class="card-category" style="background:rgba(167,139,250,.1);color:#A78BFA;border-color:rgba(167,139,250,.25)">Output</span>
+        </div>
+        <div class="card-title">Response Streaming</div>
+        <div class="card-ds">
+          <span class="chip chip-violet" style="cursor:default">Ring Buffer</span>
+          <span class="chip chip-violet" style="cursor:default">Parse Tree</span>
+        </div>
+        <!-- Streaming preview -->
+        <div class="card-preview">
+          <svg viewBox="0 0 230 75" width="230" height="75">
+            <!-- Ring buffer circle -->
+            <circle cx="40" cy="37" r="28" fill="none" stroke="#2A2A3A" stroke-width="6"/>
+            <circle cx="40" cy="37" r="28" fill="none" stroke="#A78BFA" stroke-width="6"
+              stroke-dasharray="88 176" stroke-dashoffset="0" stroke-linecap="round">
+              <animate attributeName="stroke-dasharray" values="0 176;88 176;132 176;176 176;176 176" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <text x="40" y="37" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#A78BFA" font-family="monospace">buf</text>
+            <!-- JSON tokens arriving -->
+            <text x="90" y="20" font-size="9" fill="#A78BFA" font-family="monospace" opacity="0">
+              {<animate attributeName="opacity" values="0;1;1;1;1" dur="3s" repeatCount="indefinite"/>
+            </text>
+            <text x="102" y="20" font-size="9" fill="#F1FA8C" font-family="monospace" opacity="0">
+              "k<animate attributeName="opacity" values="0;0;1;1;1" dur="3s" repeatCount="indefinite"/>
+            </text>
+            <text x="116" y="20" font-size="9" fill="#F1FA8C" font-family="monospace" opacity="0">
+              ey<animate attributeName="opacity" values="0;0;0;1;1" dur="3s" repeatCount="indefinite"/>
+            </text>
+            <text x="130" y="20" font-size="9" fill="#8080A0" font-family="monospace" opacity="0">
+              ":<animate attributeName="opacity" values="0;0;0;0;1" dur="3s" repeatCount="indefinite"/>
+            </text>
+            <!-- AST building -->
+            <line x1="165" y1="15" x2="145" y2="35" stroke="#2A2A3A" stroke-width="1" opacity="0">
+              <animate attributeName="opacity" values="0;0;0;1;1" dur="3s" repeatCount="indefinite"/>
+            </line>
+            <line x1="165" y1="15" x2="185" y2="35" stroke="#2A2A3A" stroke-width="1" opacity="0">
+              <animate attributeName="opacity" values="0;0;0;1;1" dur="3s" repeatCount="indefinite"/>
+            </line>
+            <circle cx="165" cy="14" r="8" fill="rgba(167,139,250,0.15)" stroke="#A78BFA" stroke-width="1.5" opacity="0">
+              <animate attributeName="opacity" values="0;0;1;1;1" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <text x="165" y="14" text-anchor="middle" dominant-baseline="central" font-size="6.5" fill="#A78BFA" font-family="monospace" opacity="0">obj<animate attributeName="opacity" values="0;0;1;1;1" dur="3s" repeatCount="indefinite"/></text>
+            <circle cx="145" cy="36" r="7" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" opacity="0">
+              <animate attributeName="opacity" values="0;0;0;0;1" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="185" cy="36" r="7" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" opacity="0">
+              <animate attributeName="opacity" values="0;0;0;0;1" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <text x="145" y="36" text-anchor="middle" dominant-baseline="central" font-size="5.5" fill="#8080A0" font-family="monospace" opacity="0">key<animate attributeName="opacity" values="0;0;0;0;1" dur="3s" repeatCount="indefinite"/></text>
+            <text x="185" y="36" text-anchor="middle" dominant-baseline="central" font-size="5.5" fill="#8080A0" font-family="monospace" opacity="0">val<animate attributeName="opacity" values="0;0;0;0;1" dur="3s" repeatCount="indefinite"/></text>
+            <!-- Token stream arrow -->
+            <line x1="72" y1="37" x2="88" y2="22" stroke="#A78BFA" stroke-width="1" stroke-dasharray="3,2">
+              <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.8s" repeatCount="indefinite"/>
+            </line>
+          </svg>
+        </div>
+        <p class="card-desc">Ring buffer accumulates streaming tokens. Incremental JSON parser builds an AST in real-time — validates schema structure as tokens arrive before the model finishes.</p>
+        <div class="card-meta">
+          <span class="card-complexity">O(1) buffer ops</span>
+          <span class="card-cta" style="color:#A78BFA">Explore → </span>
+        </div>
+      </div>
+    </a>
+
+  </div><!-- /card-grid -->
+</section>
+
+<div class="divider"></div>
+
+<!-- SUMMARY TABLE -->
+<div class="full-bg">
+<div class="full-bg-wrap">
+  <div class="section-label">Quick reference</div>
+  <div class="section-title">Pipeline at a glance</div>
+  <table class="cplx-table">
+    <thead>
+      <tr>
+        <th>#</th><th>Stage</th><th>Data Structures</th><th>Complexity</th><th>Used in</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="mono-badge" style="color:#9B8FFF">01</span></td>
+        <td><a href="./intent-routing/" style="color:var(--text);text-decoration:none;font-weight:600">Intent Routing</a></td>
+        <td>Trie, HashMap</td>
+        <td><span class="mono-badge">O(L)+O(1)</span></td>
+        <td style="color:var(--muted)">LangChain RouterChain, Dialogflow</td>
+      </tr>
+      <tr>
+        <td><span class="mono-badge" style="color:#00D4A4">02</span></td>
+        <td><a href="./session-memory/" style="color:var(--text);text-decoration:none;font-weight:600">Session Memory</a></td>
+        <td>Deque, LRU Cache</td>
+        <td><span class="mono-badge">O(1)</span></td>
+        <td style="color:var(--muted)">OpenAI Agents SDK, Redis</td>
+      </tr>
+      <tr>
+        <td><span class="mono-badge" style="color:#5B8FFF">03</span></td>
+        <td><a href="./orchestration/" style="color:var(--text);text-decoration:none;font-weight:600">Orchestration</a></td>
+        <td>DAG, State Machine</td>
+        <td><span class="mono-badge">O(V+E)</span></td>
+        <td style="color:var(--muted)">AWS Step Functions, LangGraph</td>
+      </tr>
+      <tr>
+        <td><span class="mono-badge" style="color:#FF6B9D">04</span></td>
+        <td><a href="./retrieval/" style="color:var(--text);text-decoration:none;font-weight:600">Knowledge Retrieval</a></td>
+        <td>HNSW Graph, Inverted Index</td>
+        <td><span class="mono-badge">O(log N)</span></td>
+        <td style="color:var(--muted)">Pinecone, Milvus, Elasticsearch</td>
+      </tr>
+      <tr>
+        <td><span class="mono-badge" style="color:#FFB347">05</span></td>
+        <td><a href="./scheduling/" style="color:var(--text);text-decoration:none;font-weight:600">Task Scheduling</a></td>
+        <td>Priority Queue, Min Heap</td>
+        <td><span class="mono-badge">O(log N)</span></td>
+        <td style="color:var(--muted)">Temporal, Celery, RabbitMQ</td>
+      </tr>
+      <tr>
+        <td><span class="mono-badge" style="color:#5BDB85">06</span></td>
+        <td><a href="./async-tracking/" style="color:var(--text);text-decoration:none;font-weight:600">Async Execution</a></td>
+        <td>HashMap → Future</td>
+        <td><span class="mono-badge">O(1)</span></td>
+        <td style="color:var(--muted)">asyncio, Ray, Step Functions</td>
+      </tr>
+      <tr>
+        <td><span class="mono-badge" style="color:#FF5252">07</span></td>
+        <td><a href="./guardrails/" style="color:var(--text);text-decoration:none;font-weight:600">Safety Guardrails</a></td>
+        <td>Aho-Corasick Trie</td>
+        <td><span class="mono-badge">O(m)</span></td>
+        <td style="color:var(--muted)">OpenAI Moderation, custom filters</td>
+      </tr>
+      <tr>
+        <td><span class="mono-badge" style="color:#A78BFA">08</span></td>
+        <td><a href="./streaming/" style="color:var(--text);text-decoration:none;font-weight:600">Response Streaming</a></td>
+        <td>Ring Buffer, AST</td>
+        <td><span class="mono-badge">O(1)</span></td>
+        <td style="color:var(--muted)">Streaming JSON parsers, Pydantic</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<footer>
+  <div style="margin-bottom:12px">
+    <a href="./intent-routing/">01</a> ·
+    <a href="./session-memory/">02</a> ·
+    <a href="./orchestration/">03</a> ·
+    <a href="./retrieval/">04</a> ·
+    <a href="./scheduling/">05</a> ·
+    <a href="./async-tracking/">06</a> ·
+    <a href="./guardrails/">07</a> ·
+    <a href="./streaming/">08</a>
+  </div>
+  DSA × AI — Data Structures Powering Modern AI Agent Pipelines
+</footer>
+
+<script>
+function filterCards(cat, el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.topic-card').forEach(card => {
+    if (cat === 'all' || card.dataset.cat === cat) {
+      card.style.display = 'flex';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  // Reflow grid for odd cards
+  const grid = document.getElementById('card-grid');
+  const visible = [...grid.querySelectorAll('.topic-card')].filter(c => c.style.display !== 'none');
+  if (visible.length % 2 !== 0 && window.innerWidth > 900) {
+    visible[visible.length - 1].style.gridColumn = '1 / -1';
+  } else {
+    visible.forEach(c => c.style.gridColumn = '');
+  }
+}
+</script>
+
+</body>
+</html>
