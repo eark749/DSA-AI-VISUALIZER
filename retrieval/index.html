@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>04 · Knowledge Retrieval — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root{--accent:#FF6B9D;--accent2:#FF8CB8;}
+.nav-stage.active{background:rgba(255,107,157,.2)!important;color:#FF6B9D!important;border-color:rgba(255,107,157,.4)!important;}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px;}
+.concept-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;}
+.concept-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px;}
+.concept-title{font-size:14px;font-weight:600;margin-bottom:6px;}
+.concept-body{font-size:13px;color:var(--muted);line-height:1.6;}
+.hnsw-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.query-result-list{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.result-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;transition:all .3s;}
+.result-item.highlight{border-color:var(--accent);background:rgba(255,107,157,.06);}
+.result-score{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);min-width:48px;}
+.result-text{font-size:13px;color:var(--text);}
+.result-badge{margin-left:auto;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;}
+.inv-table{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:grid;grid-template-columns:100px 1fr;gap:0;border-radius:8px;overflow:hidden;}
+.inv-term{background:var(--bg3);padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px;}
+.inv-docs{padding:10px 12px;font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-left:none;border-radius:0 8px 8px 0;background:var(--surface2);color:var(--muted);transition:all .3s;}
+.inv-row.lit .inv-term{border-color:var(--accent);background:rgba(255,107,157,.08);}
+.inv-row.lit .inv-docs{color:var(--accent);background:rgba(255,107,157,.06);border-color:var(--accent);}
+@media(max-width:900px){.concept-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.concept-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage active">04 Search</a>
+    <a href="../scheduling/" class="nav-stage">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage">06 Async</a>
+    <a href="../guardrails/" class="nav-stage">07 Guard</a>
+    <a href="../streaming/" class="nav-stage">08 Stream</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow" style="background:radial-gradient(ellipse,rgba(255,107,157,.1) 0%,transparent 70%)"></div>
+  <div class="eyebrow"><span class="eyebrow-dot" style="background:#FF6B9D"></span>Stage 04 · RAG Systems</div>
+  <h1>HNSW <em style="color:#FF8CB8">navigates</em>. Inverted index <em style="color:#FF8CB8">filters</em>.<br/>Together they power RAG retrieval.</h1>
+  <p class="hero-sub">Semantic similarity search via multi-layer proximity graphs plus keyword matching via inverted indexes. Every production RAG system uses both.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#demo" class="btn-primary" style="background:#FF6B9D">Try the search</a>
+    <a href="#inverted" class="btn-secondary">Inverted index</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Overview</div>
+  <div class="section-title">Two indexes, one retriever</div>
+  <p class="section-sub">Vector search finds semantically similar chunks. Keyword search finds exact matches. Hybrid retrieval uses both and re-ranks — best of both worlds.</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,107,157,.1)">🕸️</div>
+      <div class="concept-title">HNSW — approximate nearest neighbor</div>
+      <div class="concept-body">Hierarchical Navigable Small World. Multi-layer graph where each layer is a sparser subset of the previous. Navigate top-to-bottom for O(log N) search.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,107,157,.1)">📑</div>
+      <div class="concept-title">Inverted index — exact keyword match</div>
+      <div class="concept-body">Maps term → list of document IDs. O(1) postings lookup. BM25 scores docs by term frequency and inverse document frequency. Used by Elasticsearch, Postgres FTS.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,107,157,.1)">🔀</div>
+      <div class="concept-title">Hybrid retrieval</div>
+      <div class="concept-body">Run both. Merge results with Reciprocal Rank Fusion. Vector catches paraphrases; keyword catches exact product codes or names. Higher recall than either alone.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- HNSW DEMO -->
+<div class="full-bg" id="demo">
+<div class="full-bg-wrap">
+  <div class="section-label">Live demo — HNSW</div>
+  <div class="section-title">Navigate the proximity graph</div>
+  <p class="section-sub">Type a query and watch the HNSW graph search: enter at the top layer, greedily navigate to nearest neighbor, descend to next layer, repeat until base layer.</p>
+  <div class="two-col">
+    <div>
+      <div class="hnsw-wrap">
+        <div class="panel-header">
+          <div class="panel-header-title">HNSW traversal</div>
+          <span class="badge badge-pink" style="color:#FF6B9D;background:rgba(255,107,157,.12);border-color:rgba(255,107,157,.2)">O(log N)</span>
+        </div>
+        <div style="padding:12px">
+          <div style="margin-bottom:10px">
+            <input class="query-input" id="hnsw-input" placeholder="Type a query… e.g. 'billing problem'" oninput="searchHNSW(this.value)"/>
+          </div>
+          <div class="chips">
+            <span class="chip chip-pink" onclick="setQuery('billing problem')">billing problem</span>
+            <span class="chip chip-pink" onclick="setQuery('wifi not connecting')">wifi issue</span>
+            <span class="chip chip-pink" onclick="setQuery('refund my order')">refund order</span>
+            <span class="chip chip-pink" onclick="setQuery('password reset')">password reset</span>
+            <span class="chip chip-pink" onclick="setQuery('shipping delay')">shipping delay</span>
+          </div>
+          <svg id="hnsw-svg" viewBox="0 0 420 280" width="100%" style="display:block;margin-bottom:8px">
+            <!-- Layer labels -->
+            <text x="8" y="38" font-size="9" fill="#505068" font-family="'JetBrains Mono',monospace">L2 (sparse)</text>
+            <text x="8" y="118" font-size="9" fill="#505068" font-family="'JetBrains Mono',monospace">L1</text>
+            <text x="8" y="218" font-size="9" fill="#505068" font-family="'JetBrains Mono',monospace">L0 (dense)</text>
+            <!-- Layer bands -->
+            <rect x="70" y="20" width="340" height="40" rx="6" fill="rgba(255,107,157,.03)" stroke="rgba(255,107,157,.1)" stroke-width="1"/>
+            <rect x="70" y="100" width="340" height="40" rx="6" fill="rgba(255,107,157,.03)" stroke="rgba(255,107,157,.08)" stroke-width="1"/>
+            <rect x="70" y="195" width="340" height="70" rx="6" fill="rgba(255,107,157,.03)" stroke="rgba(255,107,157,.06)" stroke-width="1"/>
+            <!-- L2 edges -->
+            <line x1="140" y1="40" x2="290" y2="40" stroke="#2A2A3A" stroke-width="1" id="hl2-1"/>
+            <line x1="290" y1="40" x2="370" y2="40" stroke="#2A2A3A" stroke-width="1" id="hl2-2"/>
+            <!-- L1 edges -->
+            <line x1="110" y1="120" x2="180" y2="120" stroke="#2A2A3A" stroke-width="1" id="hl1-1"/>
+            <line x1="180" y1="120" x2="250" y2="120" stroke="#2A2A3A" stroke-width="1" id="hl1-2"/>
+            <line x1="250" y1="120" x2="320" y2="120" stroke="#2A2A3A" stroke-width="1" id="hl1-3"/>
+            <line x1="320" y1="120" x2="390" y2="120" stroke="#2A2A3A" stroke-width="1" id="hl1-4"/>
+            <!-- L0 edges -->
+            <line x1="90" y1="230" x2="130" y2="230" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="130" y1="230" x2="175" y2="230" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="175" y1="230" x2="215" y2="230" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="215" y1="230" x2="255" y2="230" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="255" y1="230" x2="295" y2="230" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="295" y1="230" x2="340" y2="230" stroke="#2A2A3A" stroke-width="1"/>
+            <line x1="340" y1="230" x2="380" y2="230" stroke="#2A2A3A" stroke-width="1"/>
+            <!-- Cross-layer edges -->
+            <line x1="140" y1="40" x2="110" y2="120" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="290" y1="40" x2="250" y2="120" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="370" y1="40" x2="390" y2="120" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="110" y1="120" x2="90" y2="230" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="180" y1="120" x2="175" y2="230" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="250" y1="120" x2="255" y2="230" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="320" y1="120" x2="295" y2="230" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="390" y1="120" x2="380" y2="230" stroke="#333345" stroke-width="1" stroke-dasharray="3,3"/>
+            <!-- L2 nodes -->
+            <g id="hn-l2a"><circle cx="140" cy="40" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.5" class="hnode"/><text x="140" y="40" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">bill</text></g>
+            <g id="hn-l2b"><circle cx="290" cy="40" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.5" class="hnode"/><text x="290" y="40" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">tech</text></g>
+            <g id="hn-l2c"><circle cx="370" cy="40" r="14" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.5" class="hnode"/><text x="370" y="40" text-anchor="middle" dominant-baseline="central" font-size="8" fill="#8080A0" font-family="'JetBrains Mono',monospace">acc</text></g>
+            <!-- L1 nodes -->
+            <g id="hn-l1a"><circle cx="110" cy="120" r="12" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2" class="hnode"/><text x="110" y="120" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="'JetBrains Mono',monospace">inv</text></g>
+            <g id="hn-l1b"><circle cx="180" cy="120" r="12" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2" class="hnode"/><text x="180" y="120" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="'JetBrains Mono',monospace">chg</text></g>
+            <g id="hn-l1c"><circle cx="250" cy="120" r="12" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2" class="hnode"/><text x="250" y="120" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="'JetBrains Mono',monospace">net</text></g>
+            <g id="hn-l1d"><circle cx="320" cy="120" r="12" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2" class="hnode"/><text x="320" y="120" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="'JetBrains Mono',monospace">ref</text></g>
+            <g id="hn-l1e"><circle cx="390" cy="120" r="12" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1.2" class="hnode"/><text x="390" y="120" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#8080A0" font-family="'JetBrains Mono',monospace">pwd</text></g>
+            <!-- L0 nodes -->
+            <g id="hn-d1"><circle cx="90" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="90" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc1</text></g>
+            <g id="hn-d2"><circle cx="130" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="130" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc2</text></g>
+            <g id="hn-d3"><circle cx="175" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="175" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc3</text></g>
+            <g id="hn-d4"><circle cx="215" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="215" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc4</text></g>
+            <g id="hn-d5"><circle cx="255" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="255" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc5</text></g>
+            <g id="hn-d6"><circle cx="295" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="295" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc6</text></g>
+            <g id="hn-d7"><circle cx="340" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="340" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc7</text></g>
+            <g id="hn-d8"><circle cx="380" cy="230" r="10" fill="#1C1C28" stroke="#2A2A3A" stroke-width="1" class="hnode"/><text x="380" y="230" text-anchor="middle" dominant-baseline="central" font-size="6" fill="#8080A0" font-family="'JetBrains Mono',monospace">doc8</text></g>
+          </svg>
+          <div id="hnsw-status" style="font-family:var(--mono);font-size:11px;color:var(--dim);padding:0 4px 4px">Enter query to begin traversal…</div>
+        </div>
+      </div>
+      <!-- Results -->
+      <div style="margin-top:16px">
+        <div style="font-size:11px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Top results</div>
+        <div class="query-result-list" id="result-list">
+          <div style="color:var(--dim);font-size:13px;font-family:var(--mono)">No query yet…</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="code-block" style="margin-bottom:20px">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · HNSW search</div></div>
+        <div class="code-body"><pre><span class="hl-kw">import</span> hnswlib
+<span class="hl-kw">import</span> numpy <span class="hl-kw">as</span> np
+
+<span class="hl-cm"># Build HNSW index</span>
+dim = <span class="hl-nb">1536</span>  <span class="hl-cm"># OpenAI embedding size</span>
+index = hnswlib.<span class="hl-cl">Index</span>(space=<span class="hl-st">'cosine'</span>, dim=dim)
+index.<span class="hl-fn">init_index</span>(
+    max_elements=<span class="hl-nb">100_000</span>,
+    ef_construction=<span class="hl-nb">200</span>,  <span class="hl-cm"># build quality</span>
+    M=<span class="hl-nb">16</span>                   <span class="hl-cm"># connections/node</span>
+)
+index.<span class="hl-fn">add_items</span>(embeddings, ids)
+
+<span class="hl-cm"># Query — O(log N) approximate NN</span>
+index.ef = <span class="hl-nb">50</span>  <span class="hl-cm"># search quality</span>
+query_vec = embed(user_query)
+labels, distances = index.<span class="hl-fn">knn_query</span>(
+    query_vec, k=<span class="hl-nb">5</span>
+)
+
+<span class="hl-cm"># Hybrid: combine with BM25</span>
+<span class="hl-kw">from</span> rank_bm25 <span class="hl-kw">import</span> <span class="hl-cl">BM25Okapi</span>
+bm25 = <span class="hl-cl">BM25Okapi</span>(tokenized_corpus)
+kw_scores = bm25.<span class="hl-fn">get_scores</span>(query_tokens)
+
+<span class="hl-cm"># Reciprocal Rank Fusion</span>
+final = <span class="hl-fn">rrf_merge</span>(
+    vector_results=labels,
+    keyword_results=<span class="hl-fn">argsort</span>(-kw_scores)
+)</pre></div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+        <div style="font-size:12px;font-weight:600;color:var(--pink);margin-bottom:10px">Production stack</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--muted)">
+          <div>🔴 <strong style="color:var(--text)">Pinecone</strong> — managed HNSW, serverless</div>
+          <div>🟡 <strong style="color:var(--text)">Qdrant</strong> — HNSW + payload filters</div>
+          <div>🟢 <strong style="color:var(--text)">Milvus</strong> — HNSW + IVF_FLAT, distributed</div>
+          <div>🔵 <strong style="color:var(--text)">pgvector</strong> — HNSW in Postgres</div>
+          <div>⚪ <strong style="color:var(--text)">FAISS</strong> — local, GPU-accelerated</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- INVERTED INDEX -->
+<div id="inverted">
+<div style="max-width:1100px;margin:0 auto;padding:80px 40px">
+  <div class="section-label">Data structure #2</div>
+  <div class="section-title">Inverted index — exact keyword search</div>
+  <p class="section-sub">Type a keyword and watch the inverted index light up the matching posting list. O(1) lookup, then intersect/union posting lists for multi-term queries.</p>
+  <div class="two-col">
+    <div>
+      <div class="panel-box">
+        <div class="panel-header"><div class="panel-header-title">Posting list lookup</div><span class="badge badge-pink" style="color:#FF6B9D;background:rgba(255,107,157,.12);border-color:rgba(255,107,157,.2)">O(1) lookup</span></div>
+        <div class="panel-body">
+          <div style="margin-bottom:14px"><input class="query-input" id="inv-input" placeholder="Type a keyword… e.g. 'refund'" oninput="searchInverted(this.value)"/></div>
+          <div class="chips">
+            <span class="chip chip-pink" onclick="setInv('billing')">billing</span>
+            <span class="chip chip-pink" onclick="setInv('refund')">refund</span>
+            <span class="chip chip-pink" onclick="setInv('wifi')">wifi</span>
+            <span class="chip chip-pink" onclick="setInv('password')">password</span>
+            <span class="chip chip-pink" onclick="setInv('order')">order</span>
+          </div>
+          <div class="inv-table" id="inv-table">
+            <div class="inv-row" id="ir-billing"><div class="inv-term">"billing"</div><div class="inv-docs">→ [doc1, doc2, doc4, doc7]</div></div>
+            <div style="height:4px"></div>
+            <div class="inv-row" id="ir-refund"><div class="inv-term">"refund"</div><div class="inv-docs">→ [doc2, doc5, doc6]</div></div>
+            <div style="height:4px"></div>
+            <div class="inv-row" id="ir-wifi"><div class="inv-term">"wifi"</div><div class="inv-docs">→ [doc3, doc4, doc8]</div></div>
+            <div style="height:4px"></div>
+            <div class="inv-row" id="ir-password"><div class="inv-term">"password"</div><div class="inv-docs">→ [doc1, doc6, doc8]</div></div>
+            <div style="height:4px"></div>
+            <div class="inv-row" id="ir-order"><div class="inv-term">"order"</div><div class="inv-docs">→ [doc1, doc2, doc3, doc5, doc7]</div></div>
+          </div>
+          <div id="inv-result" style="margin-top:14px;font-family:var(--mono);font-size:12px;color:var(--dim);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px">Enter keyword above to look up posting list…</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="code-block">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · Inverted index</div></div>
+        <div class="code-body"><pre><span class="hl-kw">from</span> collections <span class="hl-kw">import</span> defaultdict
+
+<span class="hl-kw">class</span> <span class="hl-cl">InvertedIndex</span>:
+    <span class="hl-kw">def</span> <span class="hl-fn">__init__</span>(self):
+        <span class="hl-cm"># term → set of doc IDs</span>
+        self.index = <span class="hl-cl">defaultdict</span>(set)
+
+    <span class="hl-kw">def</span> <span class="hl-fn">add_doc</span>(self, doc_id, text):
+        <span class="hl-kw">for</span> token <span class="hl-kw">in</span> <span class="hl-fn">tokenize</span>(text):
+            self.index[token].<span class="hl-fn">add</span>(doc_id)
+
+    <span class="hl-kw">def</span> <span class="hl-fn">search</span>(self, query):
+        tokens = <span class="hl-fn">tokenize</span>(query)
+        sets = [
+            self.index[t]
+            <span class="hl-kw">for</span> t <span class="hl-kw">in</span> tokens
+            <span class="hl-kw">if</span> t <span class="hl-kw">in</span> self.index
+        ]
+        <span class="hl-kw">if not</span> sets:
+            <span class="hl-kw">return</span> []
+        <span class="hl-cm"># Intersect posting lists</span>
+        <span class="hl-kw">return</span> <span class="hl-fn">list</span>(sets[<span class="hl-nb">0</span>].<span class="hl-fn">intersection</span>(*sets[<span class="hl-nb">1</span>:]))
+
+<span class="hl-cm"># Elasticsearch uses same concept</span>
+<span class="hl-cm"># at scale with BM25 scoring on top</span>
+idx = <span class="hl-cl">InvertedIndex</span>()
+idx.<span class="hl-fn">add_doc</span>(<span class="hl-nb">1</span>, <span class="hl-st">"billing invoice charge"</span>)
+idx.<span class="hl-fn">add_doc</span>(<span class="hl-nb">2</span>, <span class="hl-st">"billing refund request"</span>)
+results = idx.<span class="hl-fn">search</span>(<span class="hl-st">"billing refund"</span>)
+<span class="hl-cm"># → [2]  (only doc with both terms)</span></pre></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Comparison</div>
+  <div class="section-title">Vector vs keyword vs hybrid</div>
+  <table class="cplx-table">
+    <thead><tr><th>Method</th><th>Complexity</th><th>Handles paraphrases</th><th>Handles exact terms</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Flat vector scan</td><td><span class="mono-badge">O(N)</span></td><td>Yes</td><td>Partially</td><td>Small datasets only</td></tr>
+      <tr><td>HNSW (ANN)</td><td><span class="mono-badge">O(log N)</span></td><td>Yes</td><td>Partially</td><td>Pinecone, Milvus, Qdrant</td></tr>
+      <tr><td>Inverted index (BM25)</td><td><span class="mono-badge">O(1)</span> lookup</td><td>No</td><td>Yes</td><td>Elasticsearch, Postgres FTS</td></tr>
+      <tr><td>Hybrid (HNSW + BM25)</td><td><span class="mono-badge">O(log N)</span></td><td>Yes</td><td>Yes</td><td>Production RAG systems</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+<div class="topic-nav">
+  <a href="../orchestration/" class="topic-nav-link">
+    <span class="topic-nav-label">← Previous</span>
+    <span class="topic-nav-title">03 · Orchestration</span>
+  </a>
+  <a href="../scheduling/" class="topic-nav-link next">
+    <span class="topic-nav-label">Next →</span>
+    <span class="topic-nav-title">05 · Task Scheduling</span>
+  </a>
+</div>
+<footer>DSA × AI · <a href="../index.html">All topics</a> · Stage 04 of 08 — Knowledge Retrieval</footer>
+
+<script>
+const QUERY_MAP = {
+  'billing': { l2:'hn-l2a', l1:'hn-l1a', docs:['hn-d1','hn-d2'], results:[{score:.97,text:'How to dispute a billing charge',tag:'Billing'},{score:.91,text:'Invoice payment failed — next steps',tag:'Billing'},{score:.84,text:'Understanding your monthly statement',tag:'Billing'}] },
+  'wifi': { l2:'hn-l2b', l1:'hn-l1c', docs:['hn-d3','hn-d4'], results:[{score:.95,text:'WiFi connectivity troubleshooting guide',tag:'Tech'},{score:.88,text:'Router reset procedure',tag:'Tech'},{score:.79,text:'Network speed issues — diagnostics',tag:'Tech'}] },
+  'refund': { l2:'hn-l2a', l1:'hn-l1d', docs:['hn-d5','hn-d6'], results:[{score:.96,text:'How to request a refund for your order',tag:'Refund'},{score:.89,text:'Refund processing times by payment method',tag:'Refund'},{score:.81,text:'Partial refund policy explained',tag:'Refund'}] },
+  'password': { l2:'hn-l2c', l1:'hn-l1e', docs:['hn-d7','hn-d8'], results:[{score:.98,text:'Reset your account password step-by-step',tag:'Account'},{score:.90,text:'Two-factor authentication setup',tag:'Account'},{score:.82,text:'Account recovery options',tag:'Account'}] },
+  'shipping': { l2:'hn-l2a', l1:'hn-l1b', docs:['hn-d1','hn-d3'], results:[{score:.93,text:'Order shipping and delivery timelines',tag:'Order'},{score:.86,text:'How to track your package',tag:'Order'},{score:.77,text:'International shipping restrictions',tag:'Order'}] },
+};
+
+function resetHNSW() {
+  document.querySelectorAll('.hnode circle').forEach(c => {
+    c.setAttribute('fill','#1C1C28'); c.setAttribute('stroke','#2A2A3A'); c.setAttribute('stroke-width','1.5');
+  });
+}
+
+function animateNode(id, color, delay) {
+  setTimeout(() => {
+    const g = document.getElementById(id);
+    if (!g) return;
+    const c = g.querySelector('circle');
+    c.setAttribute('fill', color+'22'); c.setAttribute('stroke', color); c.setAttribute('stroke-width','2.5');
+    g.querySelector('text').setAttribute('fill', color);
+  }, delay);
+}
+
+async function searchHNSW(query) {
+  const q = query.toLowerCase().trim();
+  let key = null;
+  for (const k of Object.keys(QUERY_MAP)) { if (q.includes(k)) { key = k; break; } }
+  resetHNSW();
+  const status = document.getElementById('hnsw-status');
+  if (!key) { status.textContent = 'No match — try billing, wifi, refund, password, shipping'; renderResults([]); return; }
+  const m = QUERY_MAP[key];
+  status.textContent = '→ L2: entering at sparse layer…';
+  animateNode(m.l2, '#FF6B9D', 0);
+  setTimeout(() => { status.textContent = '→ L1: descending to mid layer…'; animateNode(m.l1,'#FF6B9D',0); }, 700);
+  setTimeout(() => { status.textContent = '→ L0: scanning base layer for nearest neighbors…'; m.docs.forEach((d,i) => animateNode(d,'#FF6B9D',i*200)); }, 1400);
+  setTimeout(() => { status.textContent = `✓ Found ${m.docs.length} nearest neighbors — O(log N) traversal complete`; renderResults(m.results); }, 2000);
+}
+
+function renderResults(results) {
+  const el = document.getElementById('result-list');
+  if (!results.length) { el.innerHTML = '<div style="color:var(--dim);font-size:13px;font-family:var(--mono)">No results…</div>'; return; }
+  el.innerHTML = results.map((r,i) => `
+    <div class="result-item ${i===0?'highlight':''}" style="animation-delay:${i*100}ms">
+      <div class="result-score">${r.score.toFixed(2)}</div>
+      <div class="result-text">${r.text}</div>
+      <div class="result-badge" style="background:rgba(255,107,157,.1);color:#FF6B9D;border:1px solid rgba(255,107,157,.2)">${r.tag}</div>
+    </div>`).join('');
+}
+
+function setQuery(q) { document.getElementById('hnsw-input').value = q; searchHNSW(q); }
+
+// Inverted index
+const INV_DATA = { billing:'billing', refund:'refund', wifi:'wifi', password:'password', order:'order' };
+function setInv(v) { document.getElementById('inv-input').value = v; searchInverted(v); }
+function searchInverted(text) {
+  const t = text.toLowerCase().trim();
+  document.querySelectorAll('.inv-row').forEach(r => r.classList.remove('lit'));
+  const result = document.getElementById('inv-result');
+  let matched = null;
+  for (const k of Object.keys(INV_DATA)) { if (t === k || t.includes(k)) { matched = k; break; } }
+  if (matched) {
+    document.getElementById('ir-'+matched)?.classList.add('lit');
+    const docs = { billing:'[doc1, doc2, doc4, doc7]', refund:'[doc2, doc5, doc6]', wifi:'[doc3, doc4, doc8]', password:'[doc1, doc6, doc8]', order:'[doc1, doc2, doc3, doc5, doc7]' };
+    result.innerHTML = `<span style="color:#00D4A4">✓ Posting list found</span>: "${matched}" → <span style="color:#FF6B9D">${docs[matched]}</span>`;
+  } else if (t.length > 0) {
+    result.innerHTML = `<span style="color:#FF5252">✗ Term not in index</span> — no matching posting list`;
+  } else {
+    result.textContent = 'Enter keyword above to look up posting list…';
+  }
+}
+</script>
+</body>
+</html>

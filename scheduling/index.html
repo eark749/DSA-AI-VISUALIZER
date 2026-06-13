@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>05 · Task Scheduling — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root{--accent:#FFB347;--accent2:#FFC96B;}
+.nav-stage.active{background:rgba(255,179,71,.2)!important;color:#FFB347!important;border-color:rgba(255,179,71,.4)!important;}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px;}
+.concept-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;}
+.concept-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px;}
+.concept-title{font-size:14px;font-weight:600;margin-bottom:6px;}
+.concept-body{font-size:13px;color:var(--muted);line-height:1.6;}
+
+/* Heap visualizer */
+.heap-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.heap-node{transition:all .4s cubic-bezier(.4,0,.2,1);}
+.heap-node circle{transition:fill .3s,stroke .3s;}
+.heap-node.popping circle{fill:rgba(255,179,71,.3);stroke:#FFB347;stroke-width:3;filter:drop-shadow(0 0 8px rgba(255,179,71,.5));}
+.heap-node.new circle{fill:rgba(91,219,133,.15);stroke:#5BDB85;stroke-width:2;}
+
+/* Task queue list */
+.task-list{display:flex;flex-direction:column;gap:8px;}
+.task-item{display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;transition:all .4s;}
+.task-item.interactive{border-color:rgba(255,179,71,.3);background:rgba(255,179,71,.06);}
+.task-item.background{border-color:var(--border);opacity:.7;}
+.task-item.popping{animation:taskPop .5s ease forwards;}
+@keyframes taskPop{0%{opacity:1;transform:none}50%{opacity:.5;transform:translateX(-10px) scale(.95)}100%{opacity:0;transform:translateX(-30px) scale(.9)}}
+.task-pri{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:700;}
+.task-name{flex:1;font-size:13px;font-weight:600;}
+.task-type{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em;}
+.task-time{font-family:var(--mono);font-size:11px;color:var(--dim);}
+.heap-array{display:flex;gap:4px;padding:12px 16px;overflow-x:auto;}
+.heap-cell{min-width:44px;height:44px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--bg3);font-family:var(--mono);font-size:10px;transition:all .3s;flex-shrink:0;}
+.heap-cell.root{border-color:var(--amber);background:rgba(255,179,71,.1);}
+.heap-cell-pri{font-size:13px;font-weight:700;color:var(--amber);}
+.heap-cell-idx{font-size:8px;color:var(--dim);}
+@media(max-width:900px){.concept-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.concept-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage">04 Search</a>
+    <a href="../scheduling/" class="nav-stage active">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage">06 Async</a>
+    <a href="../guardrails/" class="nav-stage">07 Guard</a>
+    <a href="../streaming/" class="nav-stage">08 Stream</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow" style="background:radial-gradient(ellipse,rgba(255,179,71,.1) 0%,transparent 70%)"></div>
+  <div class="eyebrow"><span class="eyebrow-dot" style="background:#FFB347"></span>Stage 05 · Tool Execution</div>
+  <h1>Priority heap <em style="color:#FFC96B">orders</em>.<br/>Queue ensures user tasks never wait.</h1>
+  <p class="hero-sub">Agent tool calls are tasks with priorities. A min-heap guarantees the highest-priority task always executes first — in O(log N) per operation.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#demo" class="btn-primary" style="background:#FFB347;color:#000">See the heap</a>
+    <a href="#compare" class="btn-secondary">Compare strategies</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Overview</div>
+  <div class="section-title">Why priority matters in AI agents</div>
+  <p class="section-sub">Without priorities, a background summarization job can block a user waiting for an API response. A heap fixes this in O(log N).</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,179,71,.1)">🏔️</div>
+      <div class="concept-title">Min-heap property</div>
+      <div class="concept-body">Parent priority ≤ children priorities. Root is always the highest-priority task. Insert and extract-min both O(log N) via heapify-up/down.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,179,71,.1)">⚡</div>
+      <div class="concept-title">Critical path first</div>
+      <div class="concept-body">User-facing tool calls get priority 1. Background tasks get priority 5+. The heap automatically serves critical path first — no starvation of interactive tasks.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,179,71,.1)">📊</div>
+      <div class="concept-title">Real implementation</div>
+      <div class="concept-body">Temporal workflow engine supports task priorities natively. Celery uses multiple queues (high/default/low). RabbitMQ has priority queue plugins — same heap concept.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- HEAP DEMO -->
+<div class="full-bg" id="demo">
+<div class="full-bg-wrap">
+  <div class="section-label">Live demo</div>
+  <div class="section-title">Priority queue in action</div>
+  <p class="section-sub">Add tasks with different priorities. Watch the heap reorder. Pop the highest-priority task — it always comes from the top.</p>
+
+  <div class="two-col">
+    <div>
+      <div class="heap-wrap">
+        <div class="panel-header">
+          <div class="panel-header-title">Heap tree</div>
+          <span class="badge badge-amber">O(log N) ops</span>
+        </div>
+        <svg id="heap-svg" viewBox="0 0 420 240" width="100%" style="display:block;padding:10px"></svg>
+        <div style="padding:0 16px 4px;font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase">Array representation</div>
+        <div class="heap-array" id="heap-array"></div>
+        <div style="padding:12px 16px 16px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-run" style="background:#FFB347;color:#000" onclick="popTask()">▲ Pop min</button>
+          <button class="btn-reset" onclick="resetHeap()">Reset</button>
+          <span id="heap-status" style="font-family:var(--mono);font-size:12px;color:var(--dim);align-self:center"></span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;color:var(--dim);margin-bottom:10px;letter-spacing:.04em;text-transform:uppercase;font-size:11px">Add task</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <input class="query-input" id="task-name-input" placeholder="Task name…" style="flex:1;min-width:140px"/>
+          <select class="query-select" id="task-pri-input">
+            <option value="1">Priority 1 — Critical</option>
+            <option value="2">Priority 2 — High</option>
+            <option value="3" selected>Priority 3 — Normal</option>
+            <option value="4">Priority 4 — Low</option>
+            <option value="5">Priority 5 — Background</option>
+          </select>
+          <button class="btn-run" style="background:#FFB347;color:#000" onclick="addTask()">+ Push</button>
+        </div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:10px;letter-spacing:.04em;text-transform:uppercase">Quick add</div>
+        <div class="chips">
+          <span class="chip chip-amber" onclick="quickAdd('User API call',1)">User API call P1</span>
+          <span class="chip chip-amber" onclick="quickAdd('Send response',2)">Send response P2</span>
+          <span class="chip chip-amber" onclick="quickAdd('DB lookup',3)">DB lookup P3</span>
+          <span class="chip chip-amber" onclick="quickAdd('Log metrics',4)">Log metrics P4</span>
+          <span class="chip chip-dim" onclick="quickAdd('Summarize history',5)">Summarize P5</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:10px;letter-spacing:.04em;text-transform:uppercase">Task queue (heap order)</div>
+        <div class="task-list" id="task-list"></div>
+      </div>
+      <div class="code-block" style="margin-top:20px">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · heapq</div></div>
+        <div class="code-body"><pre><span class="hl-kw">import</span> heapq
+
+<span class="hl-cm"># (priority, task_id, payload)</span>
+task_queue = []
+
+<span class="hl-kw">def</span> <span class="hl-fn">push_task</span>(priority, task):
+    heapq.<span class="hl-fn">heappush</span>(task_queue,
+        (priority, task[<span class="hl-st">"id"</span>], task)
+    )  <span class="hl-cm"># O(log N)</span>
+
+<span class="hl-kw">def</span> <span class="hl-fn">pop_task</span>():
+    pri, _, task = heapq.<span class="hl-fn">heappop</span>(task_queue)
+    <span class="hl-kw">return</span> task  <span class="hl-cm"># O(log N), always min</span>
+
+<span class="hl-cm"># Temporal equivalent</span>
+<span class="hl-cm"># workflow.execute_activity(</span>
+<span class="hl-cm">#   my_activity,</span>
+<span class="hl-cm">#   task_queue="high-priority"</span>
+<span class="hl-cm"># )</span></pre></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<section id="compare">
+  <div class="section-label">Comparison</div>
+  <div class="section-title">Queue strategies</div>
+  <table class="cplx-table">
+    <thead><tr><th>Strategy</th><th>Push</th><th>Pop min</th><th>Starvation risk</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>FIFO queue</td><td><span class="mono-badge">O(1)</span></td><td><span class="mono-badge">O(1)</span></td><td>Yes — background blocks interactive</td><td>Simple pipelines</td></tr>
+      <tr><td>Priority queue (heap)</td><td><span class="mono-badge">O(log N)</span></td><td><span class="mono-badge">O(log N)</span></td><td>Low priority may starve</td><td>Temporal, Celery, RabbitMQ</td></tr>
+      <tr><td>Multiple FIFO queues</td><td><span class="mono-badge">O(1)</span></td><td><span class="mono-badge">O(1)</span></td><td>Only with fair scheduler</td><td>SQS, most job queues</td></tr>
+      <tr><td>Weighted fair queue</td><td><span class="mono-badge">O(log N)</span></td><td><span class="mono-badge">O(log N)</span></td><td>None by design</td><td>OS schedulers, network QoS</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+<div class="topic-nav">
+  <a href="../retrieval/" class="topic-nav-link">
+    <span class="topic-nav-label">← Previous</span>
+    <span class="topic-nav-title">04 · Knowledge Retrieval</span>
+  </a>
+  <a href="../async-tracking/" class="topic-nav-link next">
+    <span class="topic-nav-label">Next →</span>
+    <span class="topic-nav-title">06 · Async Execution</span>
+  </a>
+</div>
+<footer>DSA × AI · <a href="../index.html">All topics</a> · Stage 05 of 08 — Task Scheduling</footer>
+
+<script>
+let heap = []; // [{priority, name, id, type}]
+let taskCounter = 0;
+let animating = false;
+
+const PRI_COLORS = {1:'#FF5252',2:'#FF6B9D',3:'#FFB347',4:'#5B8FFF',5:'#505068'};
+const PRI_LABELS = {1:'Critical',2:'High',3:'Normal',4:'Low',5:'Background'};
+
+function heapPush(item) {
+  heap.push(item);
+  let i = heap.length - 1;
+  while (i > 0) {
+    const parent = Math.floor((i-1)/2);
+    if (heap[parent].priority <= heap[i].priority) break;
+    [heap[parent], heap[i]] = [heap[i], heap[parent]];
+    i = parent;
+  }
+}
+
+function heapPop() {
+  if (!heap.length) return null;
+  const top = heap[0];
+  const last = heap.pop();
+  if (heap.length > 0) {
+    heap[0] = last;
+    let i = 0;
+    while (true) {
+      let smallest = i;
+      const l = 2*i+1, r = 2*i+2;
+      if (l < heap.length && heap[l].priority < heap[smallest].priority) smallest = l;
+      if (r < heap.length && heap[r].priority < heap[smallest].priority) smallest = r;
+      if (smallest === i) break;
+      [heap[smallest], heap[i]] = [heap[i], heap[smallest]];
+      i = smallest;
+    }
+  }
+  return top;
+}
+
+function renderHeapSVG() {
+  const svg = document.getElementById('heap-svg');
+  const ns = 'http://www.w3.org/2000/svg';
+  svg.innerHTML = '';
+  if (!heap.length) { svg.innerHTML = '<text x="210" y="120" text-anchor="middle" font-size="13" fill="#505068" font-family="Space Grotesk">Add tasks to see the heap tree</text>'; return; }
+
+  const positions = [];
+  const levels = Math.ceil(Math.log2(heap.length + 1));
+  heap.forEach((_, i) => {
+    const level = Math.floor(Math.log2(i+1));
+    const levelNodes = Math.pow(2, level);
+    const posInLevel = i - (levelNodes - 1);
+    const xSpacing = 420 / (levelNodes + 1);
+    const x = xSpacing * (posInLevel + 1);
+    const y = 30 + level * 65;
+    positions.push({x, y});
+  });
+
+  // Edges
+  heap.forEach((_, i) => {
+    const lc = 2*i+1, rc = 2*i+2;
+    if (lc < heap.length) {
+      const line = document.createElementNS(ns,'line');
+      line.setAttribute('x1',positions[i].x); line.setAttribute('y1',positions[i].y);
+      line.setAttribute('x2',positions[lc].x); line.setAttribute('y2',positions[lc].y);
+      line.setAttribute('stroke','#2A2A3A'); line.setAttribute('stroke-width','1.5');
+      svg.appendChild(line);
+    }
+    if (rc < heap.length) {
+      const line = document.createElementNS(ns,'line');
+      line.setAttribute('x1',positions[i].x); line.setAttribute('y1',positions[i].y);
+      line.setAttribute('x2',positions[rc].x); line.setAttribute('y2',positions[rc].y);
+      line.setAttribute('stroke','#2A2A3A'); line.setAttribute('stroke-width','1.5');
+      svg.appendChild(line);
+    }
+  });
+
+  // Nodes
+  heap.forEach((task, i) => {
+    const {x,y} = positions[i];
+    const color = PRI_COLORS[task.priority];
+    const g = document.createElementNS(ns,'g');
+    g.id = 'hnode-'+i;
+
+    const c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r', i===0?'24':'20');
+    c.setAttribute('fill', `${color}${i===0?'25':'18'}`);
+    c.setAttribute('stroke', color); c.setAttribute('stroke-width', i===0?'2.5':'1.8');
+    if (i===0) c.setAttribute('filter','drop-shadow(0 0 6px '+color+'44)');
+    g.appendChild(c);
+
+    const label = document.createElementNS(ns,'text');
+    label.setAttribute('x',x); label.setAttribute('y',y-5);
+    label.setAttribute('text-anchor','middle'); label.setAttribute('dominant-baseline','central');
+    label.setAttribute('font-size','10'); label.setAttribute('font-family',"'Space Grotesk',sans-serif");
+    label.setAttribute('font-weight','600'); label.setAttribute('fill',color);
+    label.textContent = 'P'+task.priority;
+    g.appendChild(label);
+
+    const sub = document.createElementNS(ns,'text');
+    sub.setAttribute('x',x); sub.setAttribute('y',y+9);
+    sub.setAttribute('text-anchor','middle'); sub.setAttribute('dominant-baseline','central');
+    sub.setAttribute('font-size','7.5'); sub.setAttribute('font-family',"'Space Grotesk',sans-serif");
+    sub.setAttribute('fill',color+'CC');
+    sub.textContent = task.name.split(' ').slice(0,2).join(' ');
+    g.appendChild(sub);
+
+    svg.appendChild(g);
+  });
+}
+
+function renderHeapArray() {
+  const el = document.getElementById('heap-array');
+  el.innerHTML = heap.map((t,i) => `
+    <div class="heap-cell ${i===0?'root':''}">
+      <div class="heap-cell-pri" style="color:${PRI_COLORS[t.priority]}">P${t.priority}</div>
+      <div class="heap-cell-idx">[${i}]</div>
+    </div>`).join('');
+}
+
+function renderTaskList() {
+  const el = document.getElementById('task-list');
+  if (!heap.length) { el.innerHTML = '<div style="color:var(--dim);font-size:13px;font-family:var(--mono)">Queue empty…</div>'; return; }
+  el.innerHTML = heap.slice(0,6).map((t,i) => {
+    const color = PRI_COLORS[t.priority];
+    return `<div class="task-item ${t.priority<=2?'interactive':'background'}">
+      <div class="task-pri" style="background:${color}22;color:${color}">P${t.priority}</div>
+      <div class="task-name">${t.name}</div>
+      <div class="task-type" style="background:${color}15;color:${color}">${PRI_LABELS[t.priority]}</div>
+    </div>`;
+  }).join('') + (heap.length > 6 ? `<div style="text-align:center;color:var(--dim);font-size:12px;font-family:var(--mono);padding:8px">+${heap.length-6} more…</div>` : '');
+}
+
+function render() { renderHeapSVG(); renderHeapArray(); renderTaskList(); }
+
+function addTask() {
+  const name = document.getElementById('task-name-input').value.trim() || 'Task '+taskCounter;
+  const pri = parseInt(document.getElementById('task-pri-input').value);
+  document.getElementById('task-name-input').value = '';
+  heapPush({priority:pri, name, id:++taskCounter});
+  document.getElementById('heap-status').textContent = `Pushed "${name}" (P${pri}) — heapified up`;
+  render();
+}
+
+function quickAdd(name, priority) {
+  heapPush({priority, name, id:++taskCounter});
+  document.getElementById('heap-status').textContent = `Pushed "${name}" (P${priority})`;
+  render();
+}
+
+function popTask() {
+  if (animating || !heap.length) return;
+  animating = true;
+  const top = heap[0];
+  const rootEl = document.getElementById('hnode-0');
+  if (rootEl) rootEl.querySelector('circle').setAttribute('filter','drop-shadow(0 0 12px '+PRI_COLORS[top.priority]+')');
+  setTimeout(() => {
+    heapPop();
+    document.getElementById('heap-status').textContent = `Popped: "${top.name}" (P${top.priority}) — heapified down`;
+    render(); animating = false;
+  }, 500);
+}
+
+function resetHeap() {
+  heap = []; taskCounter = 0;
+  document.getElementById('heap-status').textContent = '';
+  render();
+}
+
+// Init with sample tasks
+quickAdd('User API call', 1);
+quickAdd('Send response', 2);
+quickAdd('DB lookup', 3);
+quickAdd('Log metrics', 4);
+quickAdd('Summarize history', 5);
+</script>
+</body>
+</html>

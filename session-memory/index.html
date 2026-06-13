@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>02 · Session Memory — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root { --accent: #00D4A4; --accent2: #00FFB3; }
+.nav-stage.active { background: rgba(0,212,164,.2) !important; color: #00D4A4 !important; border-color: rgba(0,212,164,.4) !important; }
+
+/* DEQUE VISUALIZER */
+.deque-wrap { background: var(--bg3); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 24px; }
+.deque-track { display: flex; align-items: stretch; gap: 6px; min-height: 80px; overflow-x: auto; padding: 4px 0; margin-bottom: 16px; }
+.deque-item {
+  min-width: 120px; border-radius: 10px; padding: 12px 14px;
+  border: 1px solid; display: flex; flex-direction: column; gap: 4px;
+  transition: all .4s cubic-bezier(.4,0,.2,1); flex-shrink: 0;
+  position: relative;
+}
+.deque-item.entering { animation: slideIn .4s ease forwards; }
+.deque-item.leaving { animation: slideOut .4s ease forwards; }
+@keyframes slideIn { from { opacity:0; transform:translateX(30px) scale(.9); } to { opacity:1; transform:none; } }
+@keyframes slideOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateX(-30px) scale(.9); } }
+.deque-role { font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+.deque-text { font-size:12px; font-family:var(--mono); color:var(--text); line-height:1.4; }
+.deque-tokens { font-size:10px; color:var(--dim); margin-top:2px; }
+.deque-arrow-left, .deque-arrow-right {
+  display:flex; align-items:center; justify-content:center;
+  width:36px; border-radius:8px; font-size:18px; flex-shrink:0;
+  border: 1px dashed var(--border2); color:var(--dim);
+}
+.token-bar-wrap { margin-bottom:12px; }
+.token-bar-label { display:flex; justify-content:space-between; font-size:11px; color:var(--dim); margin-bottom:6px; font-family:var(--mono); }
+.token-bar-track { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.token-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(--teal),var(--teal2)); transition:width .5s ease; }
+.token-bar-fill.warn { background:linear-gradient(90deg,var(--amber),#FFD080); }
+.token-bar-fill.over { background:linear-gradient(90deg,var(--red),#FF8080); }
+.deque-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.deque-input { flex:1; min-width:180px; }
+.evict-badge { padding:4px 10px; border-radius:8px; font-size:11px; font-family:var(--mono); background:rgba(255,82,82,.1); color:var(--red); border:1px solid rgba(255,82,82,.2); display:none; }
+
+/* LRU CACHE */
+.lru-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+.lru-slot {
+  background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+  padding:14px 16px; transition:all .4s; position:relative; overflow:hidden;
+}
+.lru-slot.active { border-color:var(--teal); background:rgba(0,212,164,.06); }
+.lru-slot.evicted { border-color:var(--red); background:rgba(255,82,82,.06); animation:evictFlash .5s ease; }
+@keyframes evictFlash { 0%,100%{opacity:1} 50%{opacity:.3} }
+.lru-slot-id { font-family:var(--mono); font-size:11px; color:var(--dim); margin-bottom:4px; }
+.lru-slot-name { font-size:13px; font-weight:600; color:var(--text); margin-bottom:2px; }
+.lru-slot-time { font-size:11px; color:var(--dim); font-family:var(--mono); }
+.lru-slot-badge { position:absolute; top:10px; right:10px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:8px; }
+.lru-order { display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-family:var(--mono); font-size:12px; color:var(--muted); margin-bottom:12px; }
+.lru-order-item { padding:4px 10px; border-radius:6px; background:var(--surface2); border:1px solid var(--border); transition:all .3s; }
+.lru-order-item.hot { background:rgba(0,212,164,.12); border-color:rgba(0,212,164,.3); color:var(--teal); }
+.concept-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:48px; }
+.concept-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; }
+.concept-icon { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:14px; font-size:16px; }
+.concept-title { font-size:14px; font-weight:600; margin-bottom:6px; }
+.concept-body { font-size:13px; color:var(--muted); line-height:1.6; }
+@media(max-width:900px){ .lru-grid{grid-template-columns:1fr 1fr} .concept-grid{grid-template-columns:1fr} }
+@media(max-width:600px){ .lru-grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage active">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage">04 Search</a>
+    <a href="../scheduling/" class="nav-stage">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage">06 Async</a>
+    <a href="../guardrails/" class="nav-stage">07 Guard</a>
+    <a href="../streaming/" class="nav-stage">08 Stream</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow" style="background:radial-gradient(ellipse,rgba(0,212,164,.1) 0%,transparent 70%)"></div>
+  <div class="eyebrow"><span class="eyebrow-dot" style="background:var(--teal)"></span>Stage 02 · LLM Context Management</div>
+  <h1>Deque <em style="color:#00FFB3">slides</em>. LRU cache <em style="color:#00FFB3">evicts</em>.<br/>Together they manage agent memory.</h1>
+  <p class="hero-sub">LLMs are stateless. Agents keep conversation alive with a sliding deque for short-term turns and an LRU cache for multi-session state.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#demo" class="btn-primary" style="background:var(--teal);color:#000">See live demo</a>
+    <a href="#lru" class="btn-secondary">Explore LRU cache</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Overview</div>
+  <div class="section-title">Two layers of memory</div>
+  <p class="section-sub">Short-term uses a deque with a token budget. Long-term uses an LRU cache mapping session IDs to state — hot sessions stay in RAM, cold ones evict.</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(0,212,164,.1)">📜</div>
+      <div class="concept-title">Deque — sliding window</div>
+      <div class="concept-body">append() new messages right, popleft() oldest when token limit exceeded. O(1) both ends. OpenAI Agents SDK TrimmingSession uses exactly this.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(0,212,164,.1)">🗂️</div>
+      <div class="concept-title">LRU Cache — session store</div>
+      <div class="concept-body">HashMap + doubly-linked list. O(1) get and put. Most-recently-used sessions stay in memory. Least-recently-used evict when capacity fills.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(0,212,164,.1)">⚡</div>
+      <div class="concept-title">Why both?</div>
+      <div class="concept-body">Deque manages single conversation context. LRU manages which of thousands of concurrent sessions stay warm in memory vs disk/Redis.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- DEQUE DEMO -->
+<div class="full-bg" id="demo">
+<div class="full-bg-wrap">
+  <div class="section-label">Live demo — Deque</div>
+  <div class="section-title">Sliding context window</div>
+  <p class="section-sub">Type a message and press Send. Watch oldest turns pop when the token budget fills. This is exactly how LLM context windows are managed.</p>
+
+  <div class="two-col">
+    <div>
+      <div class="deque-wrap">
+        <div class="token-bar-wrap">
+          <div class="token-bar-label">
+            <span>Token usage</span>
+            <span id="token-count">0 / 200 tokens</span>
+          </div>
+          <div class="token-bar-track"><div class="token-bar-fill" id="token-bar" style="width:0%"></div></div>
+        </div>
+        <div class="deque-track" id="deque-track">
+          <div class="deque-arrow-left">⟵</div>
+          <div style="flex:1;display:flex;gap:6px;align-items:stretch" id="deque-items"></div>
+          <div class="deque-arrow-right">⟶</div>
+        </div>
+        <div id="evict-badge" class="evict-badge">Oldest message evicted to stay within token budget</div>
+        <div class="deque-controls">
+          <input class="query-input deque-input" id="msg-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendMsg()"/>
+          <button class="btn-run" style="background:var(--teal);color:#000" onclick="sendMsg()">Send</button>
+          <button class="btn-reset" onclick="resetDeque()">Reset</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="chip chip-teal" onclick="sendPreset('I need help with my order')">I need help with my order</span>
+        <span class="chip chip-teal" onclick="sendPreset('What is the refund policy?')">What is the refund policy?</span>
+        <span class="chip chip-teal" onclick="sendPreset('My account was charged twice')">Account charged twice</span>
+        <span class="chip chip-teal" onclick="sendPreset('Can you escalate this issue?')">Escalate this issue</span>
+        <span class="chip chip-teal" onclick="sendPreset('When will it be resolved?')">When resolved?</span>
+        <span class="chip chip-teal" onclick="sendPreset('Please send a confirmation email')">Send confirmation</span>
+      </div>
+    </div>
+    <div>
+      <div class="code-block">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · Deque sliding window</div></div>
+        <div class="code-body"><pre><span class="hl-kw">from</span> collections <span class="hl-kw">import</span> deque
+
+<span class="hl-kw">class</span> <span class="hl-cl">TrimmingSession</span>:
+    <span class="hl-kw">def</span> <span class="hl-fn">__init__</span>(self, max_tokens=<span class="hl-nb">4096</span>):
+        self._items: deque = <span class="hl-cl">deque</span>()
+        self.max_tokens = max_tokens
+
+    <span class="hl-kw">def</span> <span class="hl-fn">add_message</span>(self, role, content):
+        self._items.<span class="hl-fn">append</span>({
+            <span class="hl-st">"role"</span>: role,
+            <span class="hl-st">"content"</span>: content
+        })
+        <span class="hl-cm"># Evict oldest until within budget</span>
+        <span class="hl-kw">while</span> self.<span class="hl-fn">_count_tokens</span>() > self.max_tokens:
+            self._items.<span class="hl-fn">popleft</span>()   <span class="hl-cm"># O(1)</span>
+
+    <span class="hl-kw">def</span> <span class="hl-fn">get_context</span>(self):
+        <span class="hl-kw">return</span> <span class="hl-fn">list</span>(self._items)
+
+    <span class="hl-kw">def</span> <span class="hl-fn">_count_tokens</span>(self):
+        <span class="hl-kw">return</span> <span class="hl-fn">sum</span>(
+            <span class="hl-fn">len</span>(m[<span class="hl-st">"content"</span>].<span class="hl-fn">split</span>())
+            <span class="hl-kw">for</span> m <span class="hl-kw">in</span> self._items
+        )
+
+<span class="hl-cm"># Usage — exactly OpenAI Agents SDK pattern</span>
+session = <span class="hl-cl">TrimmingSession</span>(max_tokens=<span class="hl-nb">200</span>)
+session.<span class="hl-fn">add_message</span>(<span class="hl-st">"user"</span>, <span class="hl-st">"help with order"</span>)
+session.<span class="hl-fn">add_message</span>(<span class="hl-st">"assistant"</span>, <span class="hl-st">"sure, order ID?"</span>)
+context = session.<span class="hl-fn">get_context</span>()
+<span class="hl-cm"># → send context to LLM API call</span></pre></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- LRU DEMO -->
+<section id="lru">
+  <div class="section-label">Live demo — LRU Cache</div>
+  <div class="section-title">Multi-session state management</div>
+  <p class="section-sub">Click sessions to access them. The LRU order updates — most recently used moves to front. When capacity fills, least recently used evicts.</p>
+
+  <div class="two-col">
+    <div>
+      <div style="margin-bottom:12px;font-size:12px;color:var(--dim);font-family:var(--mono)">LRU order (left = most recent):</div>
+      <div class="lru-order" id="lru-order"></div>
+      <div class="lru-grid" id="lru-grid"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn-run" style="background:var(--teal);color:#000" onclick="addSession()">+ New session</button>
+        <button class="btn-reset" onclick="resetLRU()">Reset</button>
+      </div>
+      <div id="lru-log" style="font-family:var(--mono);font-size:12px;color:var(--dim);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;min-height:44px"></div>
+    </div>
+    <div>
+      <div class="code-block">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · LRU Cache</div></div>
+        <div class="code-body"><pre><span class="hl-kw">from</span> collections <span class="hl-kw">import</span> OrderedDict
+
+<span class="hl-kw">class</span> <span class="hl-cl">LRUCache</span>:
+    <span class="hl-kw">def</span> <span class="hl-fn">__init__</span>(self, capacity=<span class="hl-nb">4</span>):
+        self.cap = capacity
+        self.cache = <span class="hl-cl">OrderedDict</span>()
+
+    <span class="hl-kw">def</span> <span class="hl-fn">get</span>(self, session_id):
+        <span class="hl-kw">if</span> session_id <span class="hl-kw">not in</span> self.cache:
+            <span class="hl-kw">return</span> <span class="hl-kw">None</span>
+        <span class="hl-cm"># Move to end = most recently used</span>
+        self.cache.<span class="hl-fn">move_to_end</span>(session_id)
+        <span class="hl-kw">return</span> self.cache[session_id]
+
+    <span class="hl-kw">def</span> <span class="hl-fn">put</span>(self, session_id, state):
+        <span class="hl-kw">if</span> session_id <span class="hl-kw">in</span> self.cache:
+            self.cache.<span class="hl-fn">move_to_end</span>(session_id)
+        self.cache[session_id] = state
+        <span class="hl-kw">if</span> <span class="hl-fn">len</span>(self.cache) > self.cap:
+            <span class="hl-cm"># popitem(last=False) = evict LRU</span>
+            self.cache.<span class="hl-fn">popitem</span>(last=<span class="hl-kw">False</span>)
+
+<span class="hl-cm"># In practice: Redis with maxmemory-policy</span>
+<span class="hl-cm"># allkeys-lru does exactly this at scale</span>
+cache = <span class="hl-cl">LRUCache</span>(capacity=<span class="hl-nb">1000</span>)
+cache.<span class="hl-fn">put</span>(<span class="hl-st">"sess_abc"</span>, {<span class="hl-st">"history"</span>: [...]})
+state = cache.<span class="hl-fn">get</span>(<span class="hl-st">"sess_abc"</span>)  <span class="hl-cm"># O(1)</span></pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Comparison</div>
+  <div class="section-title">Memory strategy trade-offs</div>
+  <table class="cplx-table">
+    <thead><tr><th>Strategy</th><th>Complexity</th><th>Forgets</th><th>Best for</th></tr></thead>
+    <tbody>
+      <tr><td>Fixed array</td><td><span class="mono-badge">O(N)</span></td><td>Abruptly at N</td><td>Simple prototypes</td></tr>
+      <tr><td>Deque sliding window</td><td><span class="mono-badge">O(1)</span></td><td>Oldest messages</td><td>Production LLM context management</td></tr>
+      <tr><td>LRU cache</td><td><span class="mono-badge">O(1)</span></td><td>Idle sessions</td><td>Multi-user agent servers</td></tr>
+      <tr><td>Summarization</td><td><span class="mono-badge">O(tokens)</span></td><td>Detail, keeps gist</td><td>Long-running conversations</td></tr>
+      <tr><td>Vector memory</td><td><span class="mono-badge">O(log N)</span></td><td>Nothing (retrieves)</td><td>Persistent agent memory</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+<div class="topic-nav">
+  <a href="../intent-routing/" class="topic-nav-link">
+    <span class="topic-nav-label">← Previous</span>
+    <span class="topic-nav-title">01 · Intent Routing</span>
+  </a>
+  <a href="../orchestration/" class="topic-nav-link next">
+    <span class="topic-nav-label">Next →</span>
+    <span class="topic-nav-title">03 · Orchestration</span>
+  </a>
+</div>
+<footer>DSA × AI · <a href="../index.html">All topics</a> · Stage 02 of 08 — Session Memory</footer>
+
+<script>
+// DEQUE DEMO
+const MAX_TOKENS = 200;
+let dequeItems = [];
+let msgCounter = 0;
+
+const roleColors = {
+  user: { bg: 'rgba(0,212,164,.08)', border: 'rgba(0,212,164,.25)', role: '#00D4A4' },
+  assistant: { bg: 'rgba(108,99,255,.08)', border: 'rgba(108,99,255,.25)', role: '#9B8FFF' }
+};
+
+function countTokens(items) {
+  return items.reduce((s, i) => s + i.tokens, 0);
+}
+
+function renderDeque() {
+  const container = document.getElementById('deque-items');
+  container.innerHTML = '';
+  dequeItems.forEach((item, idx) => {
+    const div = document.createElement('div');
+    const c = roleColors[item.role];
+    div.className = 'deque-item';
+    div.style.cssText = `background:${c.bg};border-color:${c.border};opacity:${0.4 + (idx / Math.max(dequeItems.length-1,1)) * 0.6}`;
+    div.innerHTML = `<div class="deque-role" style="color:${c.role}">${item.role}</div><div class="deque-text">${item.text}</div><div class="deque-tokens">~${item.tokens} tokens</div>`;
+    container.appendChild(div);
+  });
+  updateTokenBar();
+}
+
+function updateTokenBar() {
+  const used = countTokens(dequeItems);
+  const pct = Math.min((used / MAX_TOKENS) * 100, 100);
+  const bar = document.getElementById('token-bar');
+  bar.style.width = pct + '%';
+  bar.className = 'token-bar-fill' + (pct > 85 ? ' over' : pct > 65 ? ' warn' : '');
+  document.getElementById('token-count').textContent = used + ' / ' + MAX_TOKENS + ' tokens';
+}
+
+function sendMsg() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const tokens = Math.max(5, Math.ceil(text.split(' ').length * 1.3) + 3);
+  dequeItems.push({ role: 'user', text, tokens, id: ++msgCounter });
+
+  // Simulate assistant reply
+  const replies = ['Got it, let me check that.', 'Sure, I can help with that.', 'Looking into it now.', 'One moment please.', 'I understand. Here is what I found.'];
+  const reply = replies[msgCounter % replies.length];
+  const replyTokens = Math.ceil(reply.split(' ').length * 1.3) + 3;
+  dequeItems.push({ role: 'assistant', text: reply, tokens: replyTokens, id: ++msgCounter });
+
+  // Evict from left while over budget
+  let evicted = false;
+  while (countTokens(dequeItems) > MAX_TOKENS && dequeItems.length > 2) {
+    dequeItems.shift();
+    evicted = true;
+  }
+  const badge = document.getElementById('evict-badge');
+  badge.style.display = evicted ? 'block' : 'none';
+  renderDeque();
+}
+
+function sendPreset(text) {
+  document.getElementById('msg-input').value = text;
+  sendMsg();
+}
+
+function resetDeque() {
+  dequeItems = []; msgCounter = 0;
+  document.getElementById('evict-badge').style.display = 'none';
+  renderDeque();
+}
+
+// LRU DEMO
+const LRU_CAP = 4;
+let lruCache = []; // [{id, name, time, order}]
+let sessionCounter = 0;
+const sessionNames = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank', 'Grace', 'Henry'];
+let lruOrder = []; // array of ids, front = most recent
+
+function renderLRU() {
+  const grid = document.getElementById('lru-grid');
+  grid.innerHTML = '';
+  lruCache.forEach(sess => {
+    const isHot = lruOrder[0] === sess.id;
+    const rank = lruOrder.indexOf(sess.id);
+    const div = document.createElement('div');
+    div.className = 'lru-slot' + (isHot ? ' active' : '');
+    div.onclick = () => accessSession(sess.id);
+    div.style.cursor = 'pointer';
+    div.innerHTML = `
+      <div class="lru-slot-id">session_${sess.id.toString().padStart(3,'0')}</div>
+      <div class="lru-slot-name">${sess.name}</div>
+      <div class="lru-slot-time">Last: ${sess.time}</div>
+      <div class="lru-slot-badge" style="background:${rank===0?'rgba(0,212,164,.15)':'rgba(255,179,71,.1)'};color:${rank===0?'#00D4A4':'#FFB347'}">${rank===0?'MRU':'rank '+(rank+1)}</div>`;
+    grid.appendChild(div);
+  });
+
+  const orderEl = document.getElementById('lru-order');
+  orderEl.innerHTML = lruOrder.map((id,i) => {
+    const s = lruCache.find(x => x.id === id);
+    return `<span class="lru-order-item ${i===0?'hot':''}">${s?s.name:'?'}</span>`;
+  }).join('<span style="color:var(--dim)">→</span>');
+}
+
+function logLRU(msg) {
+  document.getElementById('lru-log').textContent = msg;
+}
+
+function accessSession(id) {
+  const idx = lruOrder.indexOf(id);
+  if (idx > -1) lruOrder.splice(idx, 1);
+  lruOrder.unshift(id);
+  const s = lruCache.find(x => x.id === id);
+  if (s) s.time = new Date().toLocaleTimeString();
+  logLRU(`✓ Accessed session_${id.toString().padStart(3,'0')} (${s?.name}) → moved to MRU position`);
+  renderLRU();
+}
+
+function addSession() {
+  if (lruCache.length >= LRU_CAP) {
+    const lruId = lruOrder[lruOrder.length - 1];
+    const lruSess = lruCache.find(x => x.id === lruId);
+    lruCache = lruCache.filter(x => x.id !== lruId);
+    lruOrder.pop();
+
+    const slot = document.querySelector(`.lru-slot:last-child`);
+    logLRU(`⚠ Cache full (${LRU_CAP} max). Evicted ${lruSess?.name} (LRU) to make room.`);
+    setTimeout(() => {
+      const slots = document.querySelectorAll('.lru-slot');
+      if (slots.length) slots[slots.length-1].classList.add('evicted');
+    }, 10);
+  }
+
+  const id = ++sessionCounter;
+  const name = sessionNames[(id - 1) % sessionNames.length];
+  const sess = { id, name, time: new Date().toLocaleTimeString() };
+  lruCache.push(sess);
+  lruOrder.unshift(id);
+  if (!document.getElementById('lru-log').textContent.includes('Evicted')) {
+    logLRU(`✓ New session_${id.toString().padStart(3,'0')} (${name}) added → MRU position`);
+  }
+  renderLRU();
+}
+
+function resetLRU() {
+  lruCache = []; lruOrder = []; sessionCounter = 0;
+  document.getElementById('lru-grid').innerHTML = '';
+  document.getElementById('lru-order').innerHTML = '';
+  document.getElementById('lru-log').textContent = '';
+}
+
+// Init
+renderDeque();
+// Pre-populate LRU
+['Alice','Bob','Carol'].forEach(() => addSession());
+</script>
+</body>
+</html>

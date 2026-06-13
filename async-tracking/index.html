@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>06 · Async Execution — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root{--accent:#5BDB85;--accent2:#7AE89B;}
+.nav-stage.active{background:rgba(91,219,133,.2)!important;color:#5BDB85!important;border-color:rgba(91,219,133,.4)!important;}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px;}
+.concept-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;}
+.concept-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px;}
+.concept-title{font-size:14px;font-weight:600;margin-bottom:6px;}
+.concept-body{font-size:13px;color:var(--muted);line-height:1.6;}
+
+/* Async tracker */
+.future-map{display:flex;flex-direction:column;gap:8px;}
+.future-row{display:grid;grid-template-columns:130px 90px 1fr;gap:0;border-radius:10px;overflow:hidden;transition:all .4s;}
+.future-id{background:var(--bg3);padding:11px 12px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);border-right:none;border-radius:10px 0 0 10px;}
+.future-status{padding:11px 10px;font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-left:none;border-right:none;text-align:center;transition:all .4s;}
+.future-result{padding:11px 14px;font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-left:none;border-radius:0 10px 10px 0;transition:all .4s;color:var(--dim);}
+.future-row.pending .future-status{background:rgba(255,179,71,.08);color:var(--amber);}
+.future-row.running .future-status{background:rgba(91,143,255,.08);color:#5B8FFF;}
+.future-row.done .future-status{background:rgba(91,219,133,.08);color:var(--green);}
+.future-row.done .future-result{color:var(--green);}
+.future-row.error .future-status{background:rgba(255,82,82,.08);color:var(--red);}
+.future-row.error .future-result{color:var(--red);}
+.future-row.done{border-color:rgba(91,219,133,.2);}
+.future-row.running .future-id{border-color:rgba(91,143,255,.3);}
+
+/* Timeline */
+.timeline{position:relative;padding:16px 0;}
+.tl-lane{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.tl-label{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:100px;text-align:right;}
+.tl-track{flex:1;height:24px;background:var(--bg3);border-radius:6px;position:relative;overflow:hidden;border:1px solid var(--border);}
+.tl-bar{position:absolute;top:2px;height:20px;border-radius:4px;transition:width .1s linear,left .1s linear;display:flex;align-items:center;padding:0 8px;font-family:var(--mono);font-size:9px;font-weight:600;white-space:nowrap;}
+
+/* Result log */
+.result-log{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;font-family:var(--mono);font-size:12px;line-height:2;min-height:80px;max-height:160px;overflow-y:auto;}
+.rl-entry{opacity:0;transform:translateY(3px);transition:all .3s;}
+.rl-entry.show{opacity:1;transform:none;}
+@media(max-width:900px){.concept-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.concept-grid,.future-map{grid-template-columns:1fr;} .future-row{grid-template-columns:1fr;} .future-id,.future-status,.future-result{border-radius:0;border-right:1px solid var(--border);border-left:1px solid var(--border);} .future-id{border-radius:10px 10px 0 0;} .future-result{border-radius:0 0 10px 10px;}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage">04 Search</a>
+    <a href="../scheduling/" class="nav-stage">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage active">06 Async</a>
+    <a href="../guardrails/" class="nav-stage">07 Guard</a>
+    <a href="../streaming/" class="nav-stage">08 Stream</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow" style="background:radial-gradient(ellipse,rgba(91,219,133,.1) 0%,transparent 70%)"></div>
+  <div class="eyebrow"><span class="eyebrow-dot" style="background:#5BDB85"></span>Stage 06 · Concurrent Tool Calls</div>
+  <h1>HashMap tracks <em style="color:#7AE89B">in-flight futures</em>.<br/>Results route back by task ID.</h1>
+  <p class="hero-sub">When agents fire multiple tool calls concurrently, a hash map of task_id → Future lets each result find its way home in O(1) — regardless of arrival order.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#demo" class="btn-primary" style="background:#5BDB85;color:#000">Fire concurrent calls</a>
+    <a href="#compare" class="btn-secondary">See trade-offs</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Overview</div>
+  <div class="section-title">Concurrency without chaos</div>
+  <p class="section-sub">Without a tracking map, out-of-order async results can't be matched to their caller. The map is the glue that keeps concurrent execution deterministic.</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(91,219,133,.1)">🗺️</div>
+      <div class="concept-title">task_id → Future</div>
+      <div class="concept-body">Each spawned coroutine gets a unique ID. The hashmap stores ID → Future object. When a result arrives (in any order), O(1) lookup routes it to the right caller.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(91,219,133,.1)">⚡</div>
+      <div class="concept-title">Parallel speedup</div>
+      <div class="concept-body">3 tool calls sequential = 3× latency. 3 concurrent = 1× latency of the slowest. asyncio.gather(), Promise.all(), Ray remote all use this pattern.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(91,219,133,.1)">🔧</div>
+      <div class="concept-title">Cleanup on completion</div>
+      <div class="concept-body">On result or error, remove the future from the map. Track timeouts — hung tasks accumulate if never cleaned. O(1) delete from hashmap.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ASYNC DEMO -->
+<div class="full-bg" id="demo">
+<div class="full-bg-wrap">
+  <div class="section-label">Live demo</div>
+  <div class="section-title">Fire concurrent tool calls</div>
+  <p class="section-sub">Hit "Fire" to launch 4 async tool calls simultaneously. Watch the hashmap track each future, results arrive out-of-order, each routes back via task ID.</p>
+
+  <div class="two-col">
+    <div>
+      <!-- Future map -->
+      <div class="panel-box" style="margin-bottom:20px">
+        <div class="panel-header">
+          <div class="panel-header-title">pending: HashMap&lt;task_id, Future&gt;</div>
+          <span id="map-size-badge" class="badge badge-green">0 in-flight</span>
+        </div>
+        <div class="panel-body">
+          <div class="future-map" id="future-map">
+            <div style="color:var(--dim);font-family:var(--mono);font-size:12px">Map empty — fire some calls…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="panel-box">
+        <div class="panel-header"><div class="panel-header-title">Execution timeline</div></div>
+        <div style="padding:16px">
+          <div class="timeline" id="timeline"></div>
+          <div style="font-size:10px;color:var(--dim);font-family:var(--mono);text-align:right">← sequential would take 3× longer</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="btn-run" style="background:#5BDB85;color:#000" id="fire-btn" onclick="fireCalls()">⚡ Fire concurrent calls</button>
+        <button class="btn-reset" onclick="resetAsync()">Reset</button>
+      </div>
+
+      <!-- Result log -->
+      <div style="font-size:11px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Result log (out-of-order arrival)</div>
+      <div class="result-log" id="result-log"><span style="color:var(--dim)">Results will appear here as futures resolve…</span></div>
+
+      <div class="code-block" style="margin-top:20px">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · asyncio futures</div></div>
+        <div class="code-body"><pre><span class="hl-kw">import</span> asyncio, uuid
+
+<span class="hl-cm"># HashMap: task_id → Future</span>
+pending: dict[str, asyncio.Future] = {}
+
+<span class="hl-kw">async def</span> <span class="hl-fn">call_tool</span>(name, args):
+    task_id = str(uuid.<span class="hl-fn">uuid4</span>())[:8]
+    future = asyncio.<span class="hl-fn">get_event_loop</span>().<span class="hl-fn">create_future</span>()
+    pending[task_id] = future        <span class="hl-cm"># O(1) store</span>
+
+    <span class="hl-cm"># Fire and forget — result comes later</span>
+    asyncio.<span class="hl-fn">create_task</span>(<span class="hl-fn">_execute</span>(task_id, name, args))
+    <span class="hl-kw">return</span> task_id
+
+<span class="hl-kw">async def</span> <span class="hl-fn">on_result</span>(task_id, result):
+    future = pending.<span class="hl-fn">pop</span>(task_id, <span class="hl-kw">None</span>)  <span class="hl-cm"># O(1)</span>
+    <span class="hl-kw">if</span> future:
+        future.<span class="hl-fn">set_result</span>(result)
+
+<span class="hl-cm"># Fire 4 tools in parallel</span>
+ids = <span class="hl-kw">await</span> asyncio.<span class="hl-fn">gather</span>(
+    <span class="hl-fn">call_tool</span>(<span class="hl-st">"search_db"</span>, {...}),
+    <span class="hl-fn">call_tool</span>(<span class="hl-st">"fetch_api"</span>, {...}),
+    <span class="hl-fn">call_tool</span>(<span class="hl-st">"query_kb"</span>, {...}),
+    <span class="hl-fn">call_tool</span>(<span class="hl-st">"check_cache"</span>, {...}),
+)
+<span class="hl-cm"># Results arrive out of order → routed by ID</span></pre></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<section id="compare">
+  <div class="section-label">Comparison</div>
+  <div class="section-title">Concurrency patterns</div>
+  <table class="cplx-table">
+    <thead><tr><th>Pattern</th><th>Lookup</th><th>Ordering</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Sequential calls</td><td>N/A</td><td>Deterministic</td><td>Simple agents, debugging</td></tr>
+      <tr><td>HashMap + Futures</td><td><span class="mono-badge">O(1)</span></td><td>Out-of-order, ID-routed</td><td>asyncio, Ray, OpenAI Agents SDK</td></tr>
+      <tr><td>Promise.all / gather</td><td><span class="mono-badge">O(1)</span></td><td>Positional index</td><td>JavaScript agents, Python asyncio</td></tr>
+      <tr><td>Actor message passing</td><td><span class="mono-badge">O(1)</span></td><td>Mailbox FIFO per actor</td><td>Ray actors, Akka, Elixir</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+<div class="topic-nav">
+  <a href="../scheduling/" class="topic-nav-link">
+    <span class="topic-nav-label">← Previous</span>
+    <span class="topic-nav-title">05 · Task Scheduling</span>
+  </a>
+  <a href="../guardrails/" class="topic-nav-link next">
+    <span class="topic-nav-label">Next →</span>
+    <span class="topic-nav-title">07 · Safety Guardrails</span>
+  </a>
+</div>
+<footer>DSA × AI · <a href="../index.html">All topics</a> · Stage 06 of 08 — Async Execution</footer>
+
+<script>
+const TOOLS = [
+  {id:'task_a1b2', name:'search_db', desc:'Search customer DB', duration:2200, color:'#5BDB85'},
+  {id:'task_c3d4', name:'fetch_api', desc:'Call external API', duration:1400, color:'#5B8FFF'},
+  {id:'task_e5f6', name:'query_kb', desc:'Query knowledge base', duration:3000, color:'#FFB347'},
+  {id:'task_g7h8', name:'check_cache', desc:'Check Redis cache', duration:800, color:'#FF6B9D'},
+];
+const RESULTS = {
+  'task_a1b2':'{"customer":"Alice","plan":"Pro"}',
+  'task_c3d4':'{"status":200,"data":"..."}',
+  'task_e5f6':'{"docs":["doc1","doc3"],"score":0.91}',
+  'task_g7h8':'{"hit":true,"ttl":240}',
+};
+
+let running = false;
+let timers = [];
+
+function renderMap(states) {
+  const el = document.getElementById('future-map');
+  const inFlight = Object.values(states).filter(s=>s==='running'||s==='pending').length;
+  document.getElementById('map-size-badge').textContent = inFlight + ' in-flight';
+
+  if (!Object.keys(states).length) {
+    el.innerHTML = '<div style="color:var(--dim);font-family:var(--mono);font-size:12px">Map empty — fire some calls…</div>';
+    return;
+  }
+  el.innerHTML = TOOLS.map(t => {
+    const st = states[t.id] || 'pending';
+    const statusText = {pending:'⏳ pending',running:'🔄 running',done:'✓ resolved',error:'✗ error'}[st];
+    const result = st==='done' ? RESULTS[t.id] : st==='error' ? 'TimeoutError' : '…';
+    return `<div class="future-row ${st}">
+      <div class="future-id">${t.id}</div>
+      <div class="future-status">${statusText}</div>
+      <div class="future-result">${result}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTimeline(progress) {
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = TOOLS.map(t => {
+    const pct = Math.min((progress[t.id]||0)*100, 100);
+    return `<div class="tl-lane">
+      <div class="tl-label">${t.name}</div>
+      <div class="tl-track">
+        <div class="tl-bar" style="width:${pct}%;background:${t.color}33;border:1px solid ${t.color}66;color:${t.color};left:0">
+          ${pct>=15?t.desc:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function logResult(tool, result) {
+  const log = document.getElementById('result-log');
+  if (log.querySelector('span')) log.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'rl-entry';
+  const time = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  div.innerHTML = `<span style="color:var(--dim)">[${time}]</span> <span style="color:#5BDB85">✓</span> <span style="color:#7AA3FF">${tool.id}</span> → <span style="color:var(--green)">${result.slice(0,40)}…</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  requestAnimationFrame(() => div.classList.add('show'));
+}
+
+async function fireCalls() {
+  if (running) return;
+  running = true;
+  document.getElementById('fire-btn').disabled = true;
+
+  const states = {};
+  const progress = {};
+  TOOLS.forEach(t => { states[t.id]='running'; progress[t.id]=0; });
+  renderMap(states);
+  renderTimeline(progress);
+  document.getElementById('result-log').innerHTML = '';
+
+  const startTime = Date.now();
+  const maxDuration = Math.max(...TOOLS.map(t=>t.duration));
+
+  // Animate progress bars
+  const animInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    TOOLS.forEach(t => { progress[t.id] = Math.min(elapsed / t.duration, 1); });
+    renderTimeline(progress);
+    if (elapsed >= maxDuration) clearInterval(animInterval);
+  }, 50);
+
+  // Resolve each future at its own time
+  TOOLS.forEach(t => {
+    timers.push(setTimeout(() => {
+      states[t.id] = 'done';
+      renderMap({...states});
+      logResult(t, RESULTS[t.id]);
+    }, t.duration));
+  });
+
+  timers.push(setTimeout(() => {
+    running = false;
+    document.getElementById('fire-btn').disabled = false;
+    document.getElementById('map-size-badge').textContent = '0 in-flight';
+  }, maxDuration + 200));
+}
+
+function resetAsync() {
+  timers.forEach(t => clearTimeout(t)); timers = [];
+  running = false;
+  document.getElementById('fire-btn').disabled = false;
+  document.getElementById('future-map').innerHTML = '<div style="color:var(--dim);font-family:var(--mono);font-size:12px">Map empty — fire some calls…</div>';
+  document.getElementById('result-log').innerHTML = '<span style="color:var(--dim)">Results will appear here as futures resolve…</span>';
+  document.getElementById('timeline').innerHTML = '';
+  document.getElementById('map-size-badge').textContent = '0 in-flight';
+}
+</script>
+</body>
+</html>

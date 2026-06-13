@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>07 · Safety Guardrails — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root{--accent:#FF5252;--accent2:#FF7070;}
+.nav-stage.active{background:rgba(255,82,82,.2)!important;color:#FF5252!important;border-color:rgba(255,82,82,.4)!important;}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px;}
+.concept-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;}
+.concept-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px;}
+.concept-title{font-size:14px;font-weight:600;margin-bottom:6px;}
+.concept-body{font-size:13px;color:var(--muted);line-height:1.6;}
+
+/* Token stream */
+.token-stream{display:flex;flex-wrap:wrap;gap:6px;padding:16px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;min-height:60px;font-family:var(--mono);}
+.token{padding:5px 10px;border-radius:6px;font-size:13px;transition:all .3s;border:1px solid transparent;}
+.token.safe{background:var(--surface2);color:var(--muted);}
+.token.scanning{background:rgba(255,179,71,.12);border-color:rgba(255,179,71,.3);color:var(--amber);animation:scanPulse .6s ease infinite;}
+@keyframes scanPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.token.blocked{background:rgba(255,82,82,.15);border-color:#FF5252;color:#FF5252;font-weight:700;}
+.token.passed{background:rgba(91,219,133,.08);border-color:rgba(91,219,133,.2);color:var(--green);}
+
+/* Trie state machine */
+.aho-state{transition:all .3s;}
+.aho-state circle{transition:fill .3s,stroke .3s,stroke-width .3s;}
+.aho-state text{transition:fill .3s;}
+.aho-state.active circle{fill:rgba(255,82,82,.15);stroke:#FF5252;stroke-width:2.5;filter:drop-shadow(0 0 6px rgba(255,82,82,.4));}
+.aho-state.active text{fill:#FF7070;}
+.aho-state.matched circle{fill:rgba(255,82,82,.25);stroke:#FF5252;stroke-width:3;}
+.aho-state.idle circle{fill:#1C1C28;stroke:#2A2A3A;stroke-width:1.5;}
+.aho-state.idle text{fill:#8080A0;}
+
+/* Blocklist */
+.block-list{display:flex;flex-direction:column;gap:6px;}
+.block-entry{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:12px;transition:all .3s;}
+.block-entry.hit{border-color:#FF5252;background:rgba(255,82,82,.08);}
+.block-pattern{color:var(--muted);flex:1;}
+.block-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(255,82,82,.1);color:#FF5252;border:1px solid rgba(255,82,82,.2);}
+.block-badge.inactive{background:var(--surface2);color:var(--dim);border-color:var(--border);}
+
+/* Output compare */
+.output-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;font-family:var(--mono);font-size:13px;line-height:1.8;min-height:64px;transition:all .3s;}
+.output-box.blocked-output{border-color:#FF5252;background:rgba(255,82,82,.06);}
+.output-box.safe-output{border-color:rgba(91,219,133,.3);background:rgba(91,219,133,.04);}
+@media(max-width:900px){.concept-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.concept-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage">04 Search</a>
+    <a href="../scheduling/" class="nav-stage">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage">06 Async</a>
+    <a href="../guardrails/" class="nav-stage active">07 Guard</a>
+    <a href="../streaming/" class="nav-stage">08 Stream</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow" style="background:radial-gradient(ellipse,rgba(255,82,82,.1) 0%,transparent 70%)"></div>
+  <div class="eyebrow"><span class="eyebrow-dot" style="background:#FF5252"></span>Stage 07 · Content Safety</div>
+  <h1>Aho-Corasick <em style="color:#FF7070">scans every token</em>.<br/>No banned pattern slips through.</h1>
+  <p class="hero-sub">Builds a trie + failure links from all banned patterns. Scans the token stream in O(m) per token — catches multi-word phrases mid-sentence as the model streams output.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#demo" class="btn-primary" style="background:#FF5252">See it scan</a>
+    <a href="#aho" class="btn-secondary">Aho-Corasick explained</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Overview</div>
+  <div class="section-title">Why Aho-Corasick?</div>
+  <p class="section-sub">Naive scanning checks each banned pattern separately — O(m × k) where k is blacklist size. Aho-Corasick precompiles all patterns into one automaton — O(m) total, independent of how many patterns exist.</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,82,82,.1)">🌲</div>
+      <div class="concept-title">Trie construction</div>
+      <div class="concept-body">All banned patterns inserted into a prefix trie. Each node stores children for next character. Terminal nodes mark a complete banned pattern — O(sum of pattern lengths) to build.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,82,82,.1)">⚡</div>
+      <div class="concept-title">Failure links (Aho-Corasick key)</div>
+      <div class="concept-body">On mismatch, failure links jump to the longest proper suffix that is also a prefix in the trie. No backtracking. Enables scanning in a single O(m) pass over the text.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(255,82,82,.1)">🔴</div>
+      <div class="concept-title">Streaming-safe</div>
+      <div class="concept-body">State carries across token boundaries. If a banned phrase spans token 47 and 48, the automaton catches it. Each new token continues from where the last left off — no window re-scan needed.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- STREAM SCANNER DEMO -->
+<div class="full-bg" id="demo">
+<div class="full-bg-wrap">
+  <div class="section-label">Live demo — token stream scanner</div>
+  <div class="section-title">Watch the automaton catch banned patterns</div>
+  <p class="section-sub">Type or pick a sentence. The scanner walks through each token, lighting up the automaton state. Watch it catch banned words mid-stream.</p>
+
+  <div class="two-col">
+    <div>
+      <div class="panel-box" style="margin-bottom:16px">
+        <div class="panel-header"><div class="panel-header-title">Token stream</div><span id="scan-status" class="badge" style="background:var(--surface2);color:var(--dim)">idle</span></div>
+        <div class="panel-body">
+          <div style="margin-bottom:12px">
+            <input class="query-input" id="scan-input" placeholder="Type text to scan…" />
+          </div>
+          <div class="chips">
+            <span class="chip chip-red" onclick="scanText('This is a completely safe response about billing')">Safe text</span>
+            <span class="chip chip-red" onclick="scanText('Here is how to hack into the system easily')">Contains hack</span>
+            <span class="chip chip-red" onclick="scanText('The bomb squad defused the situation safely')">Contains bomb</span>
+            <span class="chip chip-red" onclick="scanText('Please kill the process and restart the server')">Contains kill</span>
+          </div>
+          <div class="token-stream" id="token-stream">
+            <span style="color:var(--dim);font-size:12px">Tokens will appear here…</span>
+          </div>
+          <div style="margin-top:12px">
+            <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Output</div>
+            <div class="output-box" id="output-box">No scan yet…</div>
+          </div>
+        </div>
+      </div>
+      <!-- Blocklist -->
+      <div class="panel-box">
+        <div class="panel-header"><div class="panel-header-title">Blocked patterns (trie)</div><span class="badge" style="background:rgba(255,82,82,.12);color:#FF5252;border:1px solid rgba(255,82,82,.2)">5 patterns</span></div>
+        <div class="panel-body">
+          <div class="block-list" id="block-list">
+            <div class="block-entry" id="bp-hack"><div class="block-pattern">"hack"</div><div class="block-badge inactive">no hit</div></div>
+            <div class="block-entry" id="bp-bomb"><div class="block-pattern">"bomb"</div><div class="block-badge inactive">no hit</div></div>
+            <div class="block-entry" id="bp-kill"><div class="block-pattern">"kill"</div><div class="block-badge inactive">no hit</div></div>
+            <div class="block-entry" id="bp-malware"><div class="block-pattern">"malware"</div><div class="block-badge inactive">no hit</div></div>
+            <div class="block-entry" id="bp-exploit"><div class="block-pattern">"exploit"</div><div class="block-badge inactive">no hit</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <!-- Aho-Corasick trie SVG -->
+      <div class="panel-box" style="margin-bottom:20px" id="aho">
+        <div class="panel-header"><div class="panel-header-title">Aho-Corasick automaton</div><span class="badge" style="background:rgba(255,82,82,.12);color:#FF5252;border:1px solid rgba(255,82,82,.2)">O(m) scan</span></div>
+        <div style="padding:12px">
+          <svg id="aho-svg" viewBox="0 0 420 260" width="100%" style="display:block">
+            <!-- Edges -->
+            <line x1="60" y1="130" x2="120" y2="60" stroke="#2A2A3A" stroke-width="1.2"/><text x="82" y="85" font-size="9" fill="#505068" font-family="monospace">h</text>
+            <line x1="60" y1="130" x2="120" y2="100" stroke="#2A2A3A" stroke-width="1.2"/><text x="82" y="108" font-size="9" fill="#505068" font-family="monospace">b</text>
+            <line x1="60" y1="130" x2="120" y2="140" stroke="#2A2A3A" stroke-width="1.2"/><text x="82" y="138" font-size="9" fill="#505068" font-family="monospace">k</text>
+            <line x1="60" y1="130" x2="120" y2="185" stroke="#2A2A3A" stroke-width="1.2"/><text x="82" y="175" font-size="9" fill="#505068" font-family="monospace">m</text>
+            <line x1="60" y1="130" x2="120" y2="225" stroke="#2A2A3A" stroke-width="1.2"/><text x="82" y="218" font-size="9" fill="#505068" font-family="monospace">e</text>
+            <!-- h-branch -->
+            <line x1="120" y1="60" x2="190" y2="40" stroke="#2A2A3A" stroke-width="1.2"/><text x="148" y="42" font-size="9" fill="#505068" font-family="monospace">a</text>
+            <line x1="190" y1="40" x2="260" y2="40" stroke="#2A2A3A" stroke-width="1.2"/><text x="220" y="35" font-size="9" fill="#505068" font-family="monospace">c</text>
+            <line x1="260" y1="40" x2="330" y2="40" stroke="#2A2A3A" stroke-width="1.2"/><text x="290" y="35" font-size="9" fill="#505068" font-family="monospace">k</text>
+            <!-- b-branch -->
+            <line x1="120" y1="100" x2="190" y2="100" stroke="#2A2A3A" stroke-width="1.2"/><text x="148" y="95" font-size="9" fill="#505068" font-family="monospace">o</text>
+            <line x1="190" y1="100" x2="260" y2="100" stroke="#2A2A3A" stroke-width="1.2"/><text x="218" y="95" font-size="9" fill="#505068" font-family="monospace">m</text>
+            <line x1="260" y1="100" x2="330" y2="100" stroke="#2A2A3A" stroke-width="1.2"/><text x="290" y="95" font-size="9" fill="#505068" font-family="monospace">b</text>
+            <!-- k-branch -->
+            <line x1="120" y1="140" x2="190" y2="140" stroke="#2A2A3A" stroke-width="1.2"/><text x="148" y="135" font-size="9" fill="#505068" font-family="monospace">i</text>
+            <line x1="190" y1="140" x2="260" y2="140" stroke="#2A2A3A" stroke-width="1.2"/><text x="218" y="135" font-size="9" fill="#505068" font-family="monospace">l</text>
+            <line x1="260" y1="140" x2="330" y2="140" stroke="#2A2A3A" stroke-width="1.2"/><text x="290" y="135" font-size="9" fill="#505068" font-family="monospace">l</text>
+            <!-- m-branch -->
+            <line x1="120" y1="185" x2="190" y2="185" stroke="#2A2A3A" stroke-width="1.2"/><text x="148" y="180" font-size="9" fill="#505068" font-family="monospace">a</text>
+            <line x1="190" y1="185" x2="260" y2="185" stroke="#2A2A3A" stroke-width="1.2"/><text x="218" y="180" font-size="9" fill="#505068" font-family="monospace">l</text>
+            <!-- e-branch -->
+            <line x1="120" y1="225" x2="190" y2="225" stroke="#2A2A3A" stroke-width="1.2"/><text x="148" y="220" font-size="9" fill="#505068" font-family="monospace">x</text>
+            <line x1="190" y1="225" x2="260" y2="225" stroke="#2A2A3A" stroke-width="1.2"/><text x="218" y="220" font-size="9" fill="#505068" font-family="monospace">p</text>
+            <!-- Terminal markers -->
+            <text x="340" y="40" font-size="9" fill="#FF5252" font-family="monospace" dominant-baseline="central">→BLOCKED</text>
+            <text x="340" y="100" font-size="9" fill="#FF5252" font-family="monospace" dominant-baseline="central">→BLOCKED</text>
+            <text x="340" y="140" font-size="9" fill="#FF5252" font-family="monospace" dominant-baseline="central">→BLOCKED</text>
+            <!-- Nodes -->
+            <g class="aho-state idle" id="as-root"><circle cx="60" cy="130" r="18"/><text x="60" y="130" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="'JetBrains Mono',monospace">root</text></g>
+            <g class="aho-state idle" id="as-h"><circle cx="120" cy="60" r="14"/><text x="120" y="60" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="'JetBrains Mono',monospace">h</text></g>
+            <g class="aho-state idle" id="as-b"><circle cx="120" cy="100" r="14"/><text x="120" y="100" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="'JetBrains Mono',monospace">b</text></g>
+            <g class="aho-state idle" id="as-k"><circle cx="120" cy="140" r="14"/><text x="120" y="140" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="'JetBrains Mono',monospace">k</text></g>
+            <g class="aho-state idle" id="as-m"><circle cx="120" cy="185" r="14"/><text x="120" y="185" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="'JetBrains Mono',monospace">m</text></g>
+            <g class="aho-state idle" id="as-e"><circle cx="120" cy="225" r="14"/><text x="120" y="225" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="'JetBrains Mono',monospace">e</text></g>
+            <g class="aho-state idle" id="as-ha"><circle cx="190" cy="40" r="12"/><text x="190" y="40" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">ha</text></g>
+            <g class="aho-state idle" id="as-hac"><circle cx="260" cy="40" r="12"/><text x="260" y="40" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">hac</text></g>
+            <g class="aho-state idle" id="as-hack"><circle cx="330" cy="40" r="14" stroke-dasharray="4,3"/><text x="330" y="40" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="'JetBrains Mono',monospace">HACK</text></g>
+            <g class="aho-state idle" id="as-bo"><circle cx="190" cy="100" r="12"/><text x="190" y="100" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">bo</text></g>
+            <g class="aho-state idle" id="as-bom"><circle cx="260" cy="100" r="12"/><text x="260" y="100" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">bom</text></g>
+            <g class="aho-state idle" id="as-bomb"><circle cx="330" cy="100" r="14" stroke-dasharray="4,3"/><text x="330" y="100" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="'JetBrains Mono',monospace">BOMB</text></g>
+            <g class="aho-state idle" id="as-ki"><circle cx="190" cy="140" r="12"/><text x="190" y="140" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">ki</text></g>
+            <g class="aho-state idle" id="as-kil"><circle cx="260" cy="140" r="12"/><text x="260" y="140" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">kil</text></g>
+            <g class="aho-state idle" id="as-kill"><circle cx="330" cy="140" r="14" stroke-dasharray="4,3"/><text x="330" y="140" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="'JetBrains Mono',monospace">KILL</text></g>
+            <g class="aho-state idle" id="as-ma"><circle cx="190" cy="185" r="12"/><text x="190" y="185" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">ma</text></g>
+            <g class="aho-state idle" id="as-mal"><circle cx="260" cy="185" r="12"/><text x="260" y="185" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">mal</text></g>
+            <g class="aho-state idle" id="as-ex"><circle cx="190" cy="225" r="12"/><text x="190" y="225" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">ex</text></g>
+            <g class="aho-state idle" id="as-exp"><circle cx="260" cy="225" r="12"/><text x="260" y="225" text-anchor="middle" dominant-baseline="central" font-size="10" font-family="'JetBrains Mono',monospace">exp</text></g>
+          </svg>
+          <div id="aho-status" style="padding:0 12px 12px;font-family:var(--mono);font-size:11px;color:var(--dim)">Waiting for scan…</div>
+        </div>
+      </div>
+      <div class="code-block">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · Aho-Corasick</div></div>
+        <div class="code-body"><pre><span class="hl-kw">import</span> ahocorasick
+
+<span class="hl-cm"># Build automaton from blacklist</span>
+A = ahocorasick.<span class="hl-cl">Automaton</span>()
+blacklist = [<span class="hl-st">"hack"</span>, <span class="hl-st">"bomb"</span>, <span class="hl-st">"kill"</span>,
+             <span class="hl-st">"malware"</span>, <span class="hl-st">"exploit"</span>]
+
+<span class="hl-kw">for</span> i, word <span class="hl-kw">in</span> <span class="hl-fn">enumerate</span>(blacklist):
+    A.<span class="hl-fn">add_word</span>(word, (i, word))
+A.<span class="hl-fn">make_automaton</span>()  <span class="hl-cm"># builds failure links</span>
+
+<span class="hl-kw">def</span> <span class="hl-fn">scan_stream</span>(text):
+    <span class="hl-cm"># O(m) — single pass, any pattern</span>
+    <span class="hl-kw">for</span> end_idx, (_, word) <span class="hl-kw">in</span> A.<span class="hl-fn">iter</span>(text):
+        start = end_idx - <span class="hl-fn">len</span>(word) + <span class="hl-nb">1</span>
+        <span class="hl-kw">yield</span> {
+            <span class="hl-st">"word"</span>: word,
+            <span class="hl-st">"pos"</span>: (start, end_idx)
+        }
+
+<span class="hl-cm"># Stream token-by-token</span>
+state = <span class="hl-nb">0</span>
+<span class="hl-kw">for</span> token <span class="hl-kw">in</span> llm_stream():
+    hits = <span class="hl-fn">list</span>(<span class="hl-fn">scan_stream</span>(token))
+    <span class="hl-kw">if</span> hits:
+        <span class="hl-fn">block_output</span>(hits)
+    <span class="hl-kw">else</span>:
+        <span class="hl-fn">emit</span>(token)</pre></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Comparison</div>
+  <div class="section-title">Pattern matching strategies</div>
+  <table class="cplx-table">
+    <thead><tr><th>Method</th><th>Complexity</th><th>Multi-pattern</th><th>Streaming</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Linear search (if/else)</td><td><span class="mono-badge">O(m×k)</span></td><td>Yes (slow)</td><td>No</td><td>Tiny blacklists only</td></tr>
+      <tr><td>Regex per pattern</td><td><span class="mono-badge">O(m×k)</span></td><td>Yes (slow)</td><td>Partial</td><td>Small lists, complex patterns</td></tr>
+      <tr><td>Aho-Corasick trie</td><td><span class="mono-badge">O(m)</span></td><td>Yes (fast)</td><td>Yes ✓</td><td>Production guardrails, antivirus</td></tr>
+      <tr><td>ML classifier</td><td><span class="mono-badge">O(tokens)</span></td><td>Yes (semantic)</td><td>Partial</td><td>OpenAI Moderation API, nuanced safety</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+<div class="topic-nav">
+  <a href="../async-tracking/" class="topic-nav-link">
+    <span class="topic-nav-label">← Previous</span>
+    <span class="topic-nav-title">06 · Async Execution</span>
+  </a>
+  <a href="../streaming/" class="topic-nav-link next">
+    <span class="topic-nav-label">Next →</span>
+    <span class="topic-nav-title">08 · Response Streaming</span>
+  </a>
+</div>
+<footer>DSA × AI · <a href="../index.html">All topics</a> · Stage 07 of 08 — Safety Guardrails</footer>
+
+<script>
+const BANNED = ['hack','bomb','kill','malware','exploit'];
+const PATTERN_IDS = {hack:'bp-hack',bomb:'bp-bomb',kill:'bp-kill',malware:'bp-malware',exploit:'bp-exploit'};
+const AHO_NODES = {
+  hack:['as-h','as-ha','as-hac','as-hack'],
+  bomb:['as-b','as-bo','as-bom','as-bomb'],
+  kill:['as-k','as-ki','as-kil','as-kill'],
+  malware:['as-m','as-ma','as-mal'],
+  exploit:['as-e','as-ex','as-exp'],
+};
+let scanning = false;
+let timers = [];
+
+function resetStates() {
+  document.querySelectorAll('.aho-state').forEach(g=>{g.className.baseVal='aho-state idle';});
+  document.querySelectorAll('.block-entry').forEach(e=>{
+    e.classList.remove('hit');
+    e.querySelector('.block-badge').className='block-badge inactive';
+    e.querySelector('.block-badge').textContent='no hit';
+  });
+}
+
+function setAhoState(nodeId, state) {
+  const g = document.getElementById(nodeId);
+  if (!g) return;
+  g.className.baseVal = 'aho-state '+state;
+}
+
+async function scanText(text) {
+  if (scanning) return;
+  document.getElementById('scan-input').value = text;
+  scanning = true;
+  timers.forEach(t=>clearTimeout(t)); timers=[];
+  resetStates();
+
+  const words = text.toLowerCase().split(/\s+/);
+  const stream = document.getElementById('token-stream');
+  const output = document.getElementById('output-box');
+  const status = document.getElementById('scan-status');
+  stream.innerHTML = '';
+  output.textContent = 'Scanning…';
+  output.className = 'output-box';
+  status.textContent = 'scanning'; status.style.background='rgba(255,179,71,.12)'; status.style.color='var(--amber)'; status.style.border='1px solid rgba(255,179,71,.25)';
+  document.getElementById('as-root').className.baseVal='aho-state active';
+
+  let blocked = null;
+  let delay = 0;
+
+  words.forEach((word, i) => {
+    const t = setTimeout(() => {
+      // Add token
+      const span = document.createElement('span');
+      span.className = 'token scanning';
+      span.textContent = word;
+      span.id = 'tok-'+i;
+      stream.appendChild(span);
+
+      // Check against banned
+      const hit = BANNED.find(b => word.includes(b));
+      if (hit) {
+        const hitNodes = AHO_NODES[hit] || [];
+        hitNodes.forEach((nid, ni) => {
+          timers.push(setTimeout(() => {
+            document.querySelectorAll('.aho-state.active').forEach(g=>g.className.baseVal='aho-state idle');
+            setAhoState(nid, ni===hitNodes.length-1?'matched':'active');
+          }, ni * 200));
+        });
+
+        timers.push(setTimeout(() => {
+          span.className = 'token blocked';
+          const bp = document.getElementById(PATTERN_IDS[hit]);
+          if (bp) {
+            bp.classList.add('hit');
+            bp.querySelector('.block-badge').className='block-badge';
+            bp.querySelector('.block-badge').textContent='HIT ⚠';
+          }
+          document.getElementById('aho-status').textContent='⚠ Pattern "'+hit+'" detected at position '+i;
+        }, hitNodes.length*200));
+
+        blocked = hit;
+      } else {
+        timers.push(setTimeout(()=>{
+          span.className='token passed';
+          document.getElementById('aho-status').textContent='✓ Token "'+word+'" — no match, continue…';
+          document.querySelectorAll('.aho-state.active').forEach(g=>g.className.baseVal='aho-state idle');
+          document.getElementById('as-root').className.baseVal='aho-state active';
+        }, 300));
+      }
+
+      // Final token
+      if (i === words.length-1) {
+        timers.push(setTimeout(()=>{
+          scanning = false;
+          if (blocked) {
+            output.textContent = '⚠ OUTPUT BLOCKED — banned pattern "'+blocked+'" detected in stream. Response suppressed.';
+            output.className='output-box blocked-output';
+            status.textContent='blocked ⚠'; status.style.background='rgba(255,82,82,.12)'; status.style.color='#FF5252'; status.style.border='1px solid rgba(255,82,82,.25)';
+          } else {
+            output.textContent = '✓ Output safe — no banned patterns detected. Response emitted.';
+            output.className='output-box safe-output';
+            status.textContent='safe ✓'; status.style.background='rgba(91,219,133,.12)'; status.style.color='#5BDB85'; status.style.border='1px solid rgba(91,219,133,.25)';
+          }
+        }, 600));
+      }
+    }, delay);
+    timers.push(t);
+    delay += 380;
+  });
+}
+
+document.getElementById('scan-input').addEventListener('keydown', e => {
+  if (e.key==='Enter') scanText(e.target.value);
+});
+</script>
+</body>
+</html>

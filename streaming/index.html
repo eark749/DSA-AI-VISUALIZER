@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>08 · Response Streaming — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root{--accent:#A78BFA;--accent2:#C4B0FF;}
+.nav-stage.active{background:rgba(167,139,250,.2)!important;color:#A78BFA!important;border-color:rgba(167,139,250,.4)!important;}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px;}
+.concept-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;}
+.concept-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:16px;}
+.concept-title{font-size:14px;font-weight:600;margin-bottom:6px;}
+.concept-body{font-size:13px;color:var(--muted);line-height:1.6;}
+
+/* Ring buffer */
+.ring-wrap{position:relative;width:200px;height:200px;margin:0 auto 20px;}
+.ring-svg{display:block;}
+
+/* Token stream display */
+.stream-display{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;font-family:var(--mono);font-size:13px;min-height:80px;line-height:1.8;word-break:break-all;}
+.stream-token{display:inline;transition:opacity .2s;}
+.stream-token.new{animation:tokenIn .3s ease forwards;}
+@keyframes tokenIn{from{opacity:0;background:rgba(167,139,250,.2)}to{opacity:1;background:transparent}}
+
+/* AST tree */
+.ast-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.ast-node{transition:all .3s;}
+.ast-node circle{transition:fill .3s,stroke .3s;}
+.ast-node.building circle{fill:rgba(167,139,250,.15);stroke:#A78BFA;stroke-width:2;filter:drop-shadow(0 0 6px rgba(167,139,250,.4));}
+.ast-node.complete circle{fill:rgba(91,219,133,.1);stroke:#5BDB85;stroke-width:2;}
+.ast-node.error circle{fill:rgba(255,82,82,.1);stroke:#FF5252;stroke-width:2;}
+.ast-node.idle circle{fill:#1C1C28;stroke:#2A2A3A;stroke-width:1.5;}
+.ast-node text{transition:fill .3s;}
+.ast-node.building text{fill:#C4B0FF;}
+.ast-node.complete text{fill:#5BDB85;}
+.ast-node.error text{fill:#FF5252;}
+.ast-node.idle text{fill:#8080A0;}
+
+/* Validation status */
+.val-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.val-row:last-child{border-bottom:none;}
+.val-icon{font-size:16px;width:24px;text-align:center;}
+.val-label{flex:1;font-size:13px;}
+.val-status{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;}
+
+/* Buffer slots */
+.buf-slots{display:flex;gap:4px;margin-bottom:8px;}
+.buf-slot{flex:1;height:36px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--dim);transition:all .3s;}
+.buf-slot.filled{background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.3);color:#A78BFA;}
+.buf-slot.active{background:rgba(167,139,250,.2);border-color:#A78BFA;color:#C4B0FF;box-shadow:0 0 8px rgba(167,139,250,.3);}
+.buf-slot.empty{background:var(--bg3);border-color:var(--border);}
+@media(max-width:900px){.concept-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.concept-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage">04 Search</a>
+    <a href="../scheduling/" class="nav-stage">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage">06 Async</a>
+    <a href="../guardrails/" class="nav-stage">07 Guard</a>
+    <a href="../streaming/" class="nav-stage active">08 Stream</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow" style="background:radial-gradient(ellipse,rgba(167,139,250,.1) 0%,transparent 70%)"></div>
+  <div class="eyebrow"><span class="eyebrow-dot" style="background:#A78BFA"></span>Stage 08 · Output Assembly</div>
+  <h1>Ring buffer <em style="color:#C4B0FF">catches tokens</em>.<br/>AST validates structure live.</h1>
+  <p class="hero-sub">Streaming output fills a ring buffer chunk by chunk. An incremental JSON parser builds an AST in real-time — catching malformed output before the model finishes.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#demo" class="btn-primary" style="background:#A78BFA">Stream a response</a>
+    <a href="#ast" class="btn-secondary">See AST build</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Overview</div>
+  <div class="section-title">Two structures at the output stage</div>
+  <p class="section-sub">Ring buffer handles the mechanical streaming. Parse tree handles structural validation. Together they let you emit tokens to the user while guaranteeing the final output is well-formed.</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(167,139,250,.1)">🔄</div>
+      <div class="concept-title">Ring buffer</div>
+      <div class="concept-body">Fixed-size circular array. Write head advances on each new token. Read head trails it. O(1) write and read. No reallocation. Used for chunked HTTP streaming and SSE event buffering.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(167,139,250,.1)">🌳</div>
+      <div class="concept-title">Incremental AST</div>
+      <div class="concept-body">JSON parser builds a tree as tokens arrive. Each '{', '[', '"' opens a node. Closing token completes it. Schema validation runs against partial tree — catches errors early.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(167,139,250,.1)">✅</div>
+      <div class="concept-title">Early validation</div>
+      <div class="concept-body">If the model is outputting malformed JSON, the incremental parser detects it within the first few tokens — long before the full response arrives. Trigger retry immediately.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- STREAMING DEMO -->
+<div class="full-bg" id="demo">
+<div class="full-bg-wrap">
+  <div class="section-label">Live demo</div>
+  <div class="section-title">Watch tokens stream through buffer → AST</div>
+  <p class="section-sub">Choose a response type and stream it. Watch the ring buffer fill, the AST build node-by-node, and schema validation run in real-time.</p>
+
+  <div class="two-col">
+    <div>
+      <!-- Ring buffer visualization -->
+      <div class="panel-box" style="margin-bottom:20px">
+        <div class="panel-header"><div class="panel-header-title">Ring buffer</div><span class="badge" style="background:rgba(167,139,250,.12);color:#A78BFA;border:1px solid rgba(167,139,250,.2)">O(1) write/read</span></div>
+        <div class="panel-body">
+          <!-- Circular ring -->
+          <div style="display:flex;justify-content:center;margin-bottom:16px">
+            <svg viewBox="0 0 200 200" width="160" height="160" style="display:block">
+              <!-- Slots as arcs -->
+              <g id="ring-slots"></g>
+              <!-- Write head -->
+              <circle id="write-head" cx="100" cy="20" r="8" fill="rgba(167,139,250,.8)" stroke="#A78BFA" stroke-width="2"/>
+              <text x="100" y="20" text-anchor="middle" dominant-baseline="central" font-size="7" fill="#fff" font-family="monospace">W</text>
+              <!-- Center -->
+              <circle cx="100" cy="100" r="30" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
+              <text id="ring-center-text" x="100" y="96" text-anchor="middle" font-size="9" fill="var(--muted)" font-family="monospace">ring</text>
+              <text id="ring-count" x="100" y="108" text-anchor="middle" font-size="9" fill="#A78BFA" font-family="monospace" font-weight="600">0/8</text>
+            </svg>
+          </div>
+          <div class="buf-slots" id="buf-slots">
+            <div class="buf-slot empty">[0]</div>
+            <div class="buf-slot empty">[1]</div>
+            <div class="buf-slot empty">[2]</div>
+            <div class="buf-slot empty">[3]</div>
+            <div class="buf-slot empty">[4]</div>
+            <div class="buf-slot empty">[5]</div>
+            <div class="buf-slot empty">[6]</div>
+            <div class="buf-slot empty">[7]</div>
+          </div>
+          <div id="buf-status" style="font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center">Buffer empty</div>
+        </div>
+      </div>
+
+      <!-- Token stream output -->
+      <div class="panel-box">
+        <div class="panel-header"><div class="panel-header-title">Streamed output</div><span id="stream-badge" class="badge" style="background:var(--surface2);color:var(--dim)">idle</span></div>
+        <div class="panel-body">
+          <div class="stream-display" id="stream-display"><span style="color:var(--dim)">Output will stream here…</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <!-- Controls -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Response type</div>
+        <div class="chips" style="margin-bottom:12px">
+          <span class="chip chip-violet" onclick="selectMode('valid')" id="mode-valid" style="border-color:rgba(167,139,250,.4)">Valid JSON</span>
+          <span class="chip chip-red" onclick="selectMode('invalid')" id="mode-invalid">Malformed JSON</span>
+          <span class="chip chip-violet" onclick="selectMode('text')" id="mode-text">Plain text</span>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-run" style="background:#A78BFA" id="stream-btn" onclick="startStream()">▶ Stream response</button>
+          <button class="btn-reset" onclick="resetStream()">Reset</button>
+        </div>
+      </div>
+
+      <!-- AST visualization -->
+      <div class="ast-wrap" id="ast" style="margin-bottom:20px">
+        <div class="panel-header"><div class="panel-header-title">Parse tree (AST)</div><span class="badge" style="background:rgba(167,139,250,.12);color:#A78BFA;border:1px solid rgba(167,139,250,.2)">builds live</span></div>
+        <svg id="ast-svg" viewBox="0 0 420 200" width="100%" style="display:block;padding:8px">
+          <!-- Edges (static) -->
+          <line x1="210" y1="30" x2="130" y2="90" stroke="#2A2A3A" stroke-width="1.2" id="ae1"/>
+          <line x1="210" y1="30" x2="210" y2="90" stroke="#2A2A3A" stroke-width="1.2" id="ae2"/>
+          <line x1="210" y1="30" x2="300" y2="90" stroke="#2A2A3A" stroke-width="1.2" id="ae3"/>
+          <line x1="130" y1="90" x2="90" y2="155" stroke="#2A2A3A" stroke-width="1.2" id="ae4"/>
+          <line x1="130" y1="90" x2="165" y2="155" stroke="#2A2A3A" stroke-width="1.2" id="ae5"/>
+          <line x1="300" y1="90" x2="265" y2="155" stroke="#2A2A3A" stroke-width="1.2" id="ae6"/>
+          <line x1="300" y1="90" x2="335" y2="155" stroke="#2A2A3A" stroke-width="1.2" id="ae7"/>
+          <!-- Nodes -->
+          <g class="ast-node idle" id="an-root"><circle cx="210" cy="28" r="20"/><text x="210" y="28" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="'JetBrains Mono',monospace">Object</text></g>
+          <g class="ast-node idle" id="an-intent"><circle cx="130" cy="90" r="18"/><text x="130" y="90" text-anchor="middle" dominant-baseline="central" font-size="8" font-family="'JetBrains Mono',monospace">intent</text></g>
+          <g class="ast-node idle" id="an-conf"><circle cx="210" cy="90" r="18"/><text x="210" y="90" text-anchor="middle" dominant-baseline="central" font-size="8" font-family="'JetBrains Mono',monospace">conf</text></g>
+          <g class="ast-node idle" id="an-agent"><circle cx="300" cy="90" r="18"/><text x="300" y="90" text-anchor="middle" dominant-baseline="central" font-size="8" font-family="'JetBrains Mono',monospace">agent</text></g>
+          <g class="ast-node idle" id="an-v1"><circle cx="90" cy="155" r="16"/><text x="90" y="155" text-anchor="middle" dominant-baseline="central" font-size="8" font-family="'JetBrains Mono',monospace">"bill"</text></g>
+          <g class="ast-node idle" id="an-v2"><circle cx="165" cy="155" r="16"/><text x="165" y="155" text-anchor="middle" dominant-baseline="central" font-size="8" font-family="'JetBrains Mono',monospace">0.97</text></g>
+          <g class="ast-node idle" id="an-v3"><circle cx="265" cy="155" r="16"/><text x="265" y="155" text-anchor="middle" dominant-baseline="central" font-size="8" font-family="'JetBrains Mono',monospace">"bill"</text></g>
+          <g class="ast-node idle" id="an-v4"><circle cx="335" cy="155" r="16"/><text x="335" y="155" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="'JetBrains Mono',monospace">Agent</text></g>
+        </svg>
+        <div id="ast-status" style="padding:0 16px 12px;font-family:var(--mono);font-size:11px;color:var(--dim)">Waiting for stream…</div>
+      </div>
+
+      <!-- Schema validation -->
+      <div class="panel-box">
+        <div class="panel-header"><div class="panel-header-title">Schema validation</div></div>
+        <div class="panel-body" style="padding:12px 16px">
+          <div class="val-row"><div class="val-icon">◯</div><div class="val-label">Object opened</div><div class="val-status" id="vs1" style="background:var(--surface2);color:var(--dim)">waiting</div></div>
+          <div class="val-row"><div class="val-icon">◯</div><div class="val-label">"intent" field present</div><div class="val-status" id="vs2" style="background:var(--surface2);color:var(--dim)">waiting</div></div>
+          <div class="val-row"><div class="val-icon">◯</div><div class="val-label">"confidence" field present</div><div class="val-status" id="vs3" style="background:var(--surface2);color:var(--dim)">waiting</div></div>
+          <div class="val-row"><div class="val-icon">◯</div><div class="val-label">"agent" field present</div><div class="val-status" id="vs4" style="background:var(--surface2);color:var(--dim)">waiting</div></div>
+          <div class="val-row"><div class="val-icon">◯</div><div class="val-label">Object closed correctly</div><div class="val-status" id="vs5" style="background:var(--surface2);color:var(--dim)">waiting</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="code-block" style="margin-top:32px">
+    <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · Streaming + incremental parsing</div></div>
+    <div class="code-body"><pre><span class="hl-kw">from</span> collections <span class="hl-kw">import</span> deque
+<span class="hl-kw">import</span> ijson  <span class="hl-cm"># streaming JSON parser</span>
+
+<span class="hl-kw">class</span> <span class="hl-cl">StreamBuffer</span>:
+    <span class="hl-kw">def</span> <span class="hl-fn">__init__</span>(self, size=<span class="hl-nb">8</span>):
+        self.buf = [<span class="hl-kw">None</span>] * size        <span class="hl-cm"># ring array</span>
+        self.write = self.read = <span class="hl-nb">0</span>
+        self.size = size
+
+    <span class="hl-kw">def</span> <span class="hl-fn">push</span>(self, token):             <span class="hl-cm"># O(1)</span>
+        self.buf[self.write % self.size] = token
+        self.write += <span class="hl-nb">1</span>
+
+    <span class="hl-kw">def</span> <span class="hl-fn">pop</span>(self):                     <span class="hl-cm"># O(1)</span>
+        token = self.buf[self.read % self.size]
+        self.read += <span class="hl-nb">1</span>
+        <span class="hl-kw">return</span> token
+
+<span class="hl-cm"># Incremental JSON parse as tokens stream</span>
+buf = <span class="hl-cl">StreamBuffer</span>()
+parser = ijson.<span class="hl-fn">parse</span>(stream)
+
+<span class="hl-kw">async for</span> token <span class="hl-kw">in</span> llm_stream():
+    buf.<span class="hl-fn">push</span>(token)                    <span class="hl-cm"># buffer it</span>
+    <span class="hl-kw">try</span>:
+        event = <span class="hl-fn">next</span>(parser)           <span class="hl-cm"># advance AST</span>
+        validate_partial(event)        <span class="hl-cm"># check schema</span>
+        <span class="hl-fn">emit</span>(buf.<span class="hl-fn">pop</span>())                <span class="hl-cm"># send to client</span>
+    <span class="hl-kw">except</span> <span class="hl-cl">ValueError</span>:
+        <span class="hl-fn">trigger_retry</span>()               <span class="hl-cm"># early fail</span></pre></div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Comparison</div>
+  <div class="section-title">Output assembly strategies</div>
+  <table class="cplx-table">
+    <thead><tr><th>Strategy</th><th>Latency</th><th>Validation</th><th>Memory</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Buffer full then emit</td><td>High (wait for end)</td><td>Post-hoc</td><td>O(N)</td><td>Simple agents, batch processing</td></tr>
+      <tr><td>Ring buffer + stream</td><td>Low (token-by-token)</td><td>None</td><td>O(1) fixed</td><td>ChatGPT UI, Claude streaming</td></tr>
+      <tr><td>Ring buffer + incremental AST</td><td>Low</td><td>Real-time</td><td>O(depth)</td><td>Production structured outputs</td></tr>
+      <tr><td>Pydantic post-validation</td><td>High (full response)</td><td>After completion</td><td>O(N)</td><td>OpenAI Structured Outputs</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+<div class="topic-nav">
+  <a href="../guardrails/" class="topic-nav-link">
+    <span class="topic-nav-label">← Previous</span>
+    <span class="topic-nav-title">07 · Safety Guardrails</span>
+  </a>
+  <a href="../index.html" class="topic-nav-link next">
+    <span class="topic-nav-label">↩ Back to hub</span>
+    <span class="topic-nav-title">All 8 topics</span>
+  </a>
+</div>
+<footer>DSA × AI · <a href="../index.html">All topics</a> · Stage 08 of 08 — Response Streaming</footer>
+
+<script>
+const BUF_SIZE = 8;
+let writeHead = 0;
+let bufContents = new Array(BUF_SIZE).fill(null);
+let streamTimers = [];
+let currentMode = 'valid';
+
+const STREAMS = {
+  valid: ['{"', '"intent"', ':', '"billing"', ',', '"confidence"', ':', '0.97', ',', '"agent"', ':', '"BillingAgent"', '}'],
+  invalid: ['{"', '"intent"', ':', '"billing"', ',', '"confidence"', ':', '{broken', '!!', 'malformed'],
+  text: ['The', 'billing', 'agent', 'will', 'handle', 'your', 'invoice', 'query.', 'Please', 'wait…'],
+};
+
+const AST_STEPS = {
+  valid: [
+    { nodes:['an-root'], status:'Object opened', vs:1 },
+    { nodes:['an-root','an-intent'], status:'"intent" key parsed', vs:2 },
+    { nodes:['an-root','an-intent','an-v1'], status:'"billing" value set', vs:2 },
+    { nodes:['an-root','an-conf'], status:'"confidence" key parsed', vs:3 },
+    { nodes:['an-root','an-conf','an-v2'], status:'0.97 value set', vs:3 },
+    { nodes:['an-root','an-agent'], status:'"agent" key parsed', vs:4 },
+    { nodes:['an-root','an-agent','an-v3','an-v4'], status:'"BillingAgent" value set', vs:4 },
+    { nodes:[], status:'✓ Object closed — schema valid', vs:5, complete:true },
+  ],
+  invalid: [
+    { nodes:['an-root'], status:'Object opened', vs:1 },
+    { nodes:['an-root','an-intent'], status:'"intent" key parsed', vs:2 },
+    { nodes:['an-root','an-intent','an-v1'], status:'"billing" value set', vs:2 },
+    { nodes:['an-root','an-conf'], status:'"confidence" key parsed', vs:3 },
+    { nodes:['an-root','an-conf'], status:'⚠ Expected number, got object!', vs:null, error:true },
+  ],
+  text: [],
+};
+
+function selectMode(mode) {
+  currentMode = mode;
+  ['valid','invalid','text'].forEach(m => {
+    document.getElementById('mode-'+m).style.borderColor = m===mode ? 'rgba(167,139,250,.5)' : '';
+  });
+}
+
+function setVal(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (state === 'ok') { el.textContent='✓ ok'; el.style.background='rgba(91,219,133,.12)'; el.style.color='#5BDB85'; }
+  else if (state === 'err') { el.textContent='✗ error'; el.style.background='rgba(255,82,82,.12)'; el.style.color='#FF5252'; }
+  else { el.textContent='waiting'; el.style.background='var(--surface2)'; el.style.color='var(--dim)'; }
+}
+
+function setASTNode(id, state) {
+  const g = document.getElementById(id);
+  if (!g) return;
+  g.className.baseVal = 'ast-node ' + state;
+}
+
+function updateRingBuf(token, idx) {
+  const slot = idx % BUF_SIZE;
+  bufContents[slot] = token;
+  const slots = document.getElementById('buf-slots').children;
+  for (let i=0; i<BUF_SIZE; i++) {
+    const s = slots[i];
+    s.className = 'buf-slot';
+    if (bufContents[i]) {
+      s.className += i===slot ? ' active' : ' filled';
+      s.textContent = bufContents[i].slice(0,4);
+    } else {
+      s.className += ' empty';
+      s.textContent = '['+i+']';
+    }
+  }
+  // Ring SVG
+  const ring = document.getElementById('ring-slots');
+  ring.innerHTML = '';
+  const cx=100,cy=100,r=62;
+  const filled = bufContents.filter(Boolean).length;
+  document.getElementById('ring-count').textContent = filled+'/'+BUF_SIZE;
+  for (let i=0;i<BUF_SIZE;i++) {
+    const angle = (i/BUF_SIZE)*Math.PI*2 - Math.PI/2;
+    const x = cx+r*Math.cos(angle), y = cy+r*Math.sin(angle);
+    const ns='http://www.w3.org/2000/svg';
+    const c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r','10');
+    c.setAttribute('fill', bufContents[i]?(i===slot?'rgba(167,139,250,.4)':'rgba(167,139,250,.15)'):'#1C1C28');
+    c.setAttribute('stroke', bufContents[i]?(i===slot?'#A78BFA':'rgba(167,139,250,.3)'):'#2A2A3A');
+    c.setAttribute('stroke-width', i===slot?'2':'1');
+    ring.appendChild(c);
+  }
+  // Write head position
+  const wAngle = (slot/BUF_SIZE)*Math.PI*2 - Math.PI/2;
+  const wh = document.getElementById('write-head');
+  wh.setAttribute('cx', cx+(r+18)*Math.cos(wAngle));
+  wh.setAttribute('cy', cy+(r+18)*Math.sin(wAngle));
+  document.getElementById('buf-status').textContent = 'Slot ['+slot+'] written: "'+token+'"';
+}
+
+async function startStream() {
+  if (streamTimers.length) return;
+  resetStreamVisuals();
+  const tokens = STREAMS[currentMode];
+  const astSteps = AST_STEPS[currentMode] || [];
+  const display = document.getElementById('stream-display');
+  const badge = document.getElementById('stream-badge');
+  const astStatus = document.getElementById('ast-status');
+  display.innerHTML = '';
+  badge.textContent='streaming'; badge.style.background='rgba(167,139,250,.12)'; badge.style.color='#A78BFA'; badge.style.border='1px solid rgba(167,139,250,.25)';
+
+  let done = false;
+  tokens.forEach((tok, i) => {
+    streamTimers.push(setTimeout(() => {
+      updateRingBuf(tok, i);
+      const span = document.createElement('span');
+      span.className='stream-token new';
+      span.textContent = tok+' ';
+      display.appendChild(span);
+
+      const astStep = astSteps[Math.min(i, astSteps.length-1)];
+      if (astStep && currentMode !== 'text') {
+        if (astStep.error) {
+          document.querySelectorAll('.ast-node').forEach(g=>g.className.baseVal='ast-node idle');
+          astStep.nodes?.forEach(n=>setASTNode(n,'error'));
+          astStatus.textContent = '✗ Parse error: '+astStep.status;
+          astStatus.style.color='#FF5252';
+          for (let v=1;v<=5;v++) { if (v===astStep.vs) setVal('vs'+v,'err'); }
+          badge.textContent='parse error ✗'; badge.style.background='rgba(255,82,82,.12)'; badge.style.color='#FF5252'; badge.style.border='1px solid rgba(255,82,82,.25)';
+          done = true;
+        } else {
+          document.querySelectorAll('.ast-node').forEach(g=>g.className.baseVal='ast-node idle');
+          if (astStep.complete) {
+            document.querySelectorAll('.ast-node').forEach(g=>g.className.baseVal='ast-node complete');
+            astStatus.textContent='✓ '+astStep.status; astStatus.style.color='#5BDB85';
+            for (let v=1;v<=5;v++) setVal('vs'+v,'ok');
+            badge.textContent='complete ✓'; badge.style.background='rgba(91,219,133,.12)'; badge.style.color='#5BDB85'; badge.style.border='1px solid rgba(91,219,133,.25)';
+          } else {
+            astStep.nodes?.forEach(n=>setASTNode(n,'building'));
+            astStatus.textContent='→ '+astStep.status; astStatus.style.color='#C4B0FF';
+            if (astStep.vs) setVal('vs'+astStep.vs,'ok');
+          }
+        }
+      }
+
+      if (i===tokens.length-1 && !done) {
+        streamTimers = [];
+        if (currentMode==='text') { badge.textContent='complete ✓'; badge.style.background='rgba(91,219,133,.12)'; badge.style.color='#5BDB85'; badge.style.border='1px solid rgba(91,219,133,.25)'; }
+      }
+    }, i*320));
+  });
+}
+
+function resetStreamVisuals() {
+  streamTimers.forEach(t=>clearTimeout(t)); streamTimers=[];
+  writeHead=0; bufContents=new Array(BUF_SIZE).fill(null);
+  document.getElementById('stream-display').innerHTML='<span style="color:var(--dim)">Output will stream here…</span>';
+  document.getElementById('buf-slots').querySelectorAll('.buf-slot').forEach((s,i)=>{s.className='buf-slot empty';s.textContent='['+i+']';});
+  document.getElementById('ring-slots').innerHTML='';
+  document.getElementById('ring-count').textContent='0/8';
+  document.getElementById('buf-status').textContent='Buffer empty';
+  document.getElementById('ast-status').textContent='Waiting for stream…'; document.getElementById('ast-status').style.color='var(--dim)';
+  document.querySelectorAll('.ast-node').forEach(g=>g.className.baseVal='ast-node idle');
+  for(let v=1;v<=5;v++) setVal('vs'+v,'waiting');
+  const badge=document.getElementById('stream-badge'); badge.textContent='idle'; badge.style.background='var(--surface2)'; badge.style.color='var(--dim)'; badge.style.border='1px solid var(--border)';
+  const wh=document.getElementById('write-head'); wh.setAttribute('cx','100'); wh.setAttribute('cy','20');
+}
+
+function resetStream() { resetStreamVisuals(); }
+
+// Init ring vis
+for(let i=0;i<BUF_SIZE;i++){
+  const ns='http://www.w3.org/2000/svg';
+  const cx=100,cy=100,r=62;
+  const angle=(i/BUF_SIZE)*Math.PI*2-Math.PI/2;
+  const x=cx+r*Math.cos(angle),y=cy+r*Math.sin(angle);
+  const c=document.createElementNS(ns,'circle');
+  c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r','10');
+  c.setAttribute('fill','#1C1C28');c.setAttribute('stroke','#2A2A3A');c.setAttribute('stroke-width','1');
+  document.getElementById('ring-slots').appendChild(c);
+}
+selectMode('valid');
+</script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>03 · Orchestration DAG — DSA × AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+:root { --accent: #5B8FFF; --accent2: #7AA3FF; }
+.nav-stage.active { background: rgba(91,143,255,.2) !important; color: #5B8FFF !important; border-color: rgba(91,143,255,.4) !important; }
+
+.dag-canvas-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.dag-svg-container { position: relative; }
+svg#dag-svg { display: block; width: 100%; }
+
+.dag-node { cursor: pointer; }
+.dag-node circle { transition: fill .3s, stroke .3s, stroke-width .3s, filter .3s; }
+.dag-node text { transition: fill .3s; pointer-events: none; }
+.dag-node.idle circle { fill: #1C1C28; stroke: #2A2A3A; stroke-width: 1.5; }
+.dag-node.idle text { fill: #8080A0; }
+.dag-node.running circle { fill: rgba(91,143,255,.15); stroke: #5B8FFF; stroke-width: 2.5; filter: drop-shadow(0 0 8px rgba(91,143,255,.4)); }
+.dag-node.running text { fill: #7AA3FF; }
+.dag-node.done circle { fill: rgba(91,219,133,.12); stroke: #5BDB85; stroke-width: 2; }
+.dag-node.done text { fill: #5BDB85; }
+.dag-node.blocked circle { fill: rgba(255,82,82,.08); stroke: #FF5252; stroke-width: 1.5; }
+.dag-node.blocked text { fill: #FF5252; }
+.dag-edge { transition: stroke .4s, stroke-width .4s, opacity .4s; }
+.dag-edge.active { stroke: #5B8FFF !important; stroke-width: 2.5 !important; }
+.dag-edge.done { stroke: #5BDB85 !important; stroke-width: 2 !important; }
+
+.exec-log { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 2; min-height: 140px; overflow-y: auto; max-height: 200px; }
+.log-entry { opacity: 0; transform: translateY(4px); transition: all .3s; }
+.log-entry.show { opacity: 1; transform: none; }
+
+.pattern-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 40px; }
+.pattern-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all .2s; }
+.pattern-card:hover, .pattern-card.selected { border-color: #5B8FFF; background: rgba(91,143,255,.06); }
+.pattern-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.pattern-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+.concept-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 48px; }
+.concept-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+.concept-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 16px; }
+.concept-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.concept-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+@media(max-width:900px){ .pattern-grid,.concept-grid{grid-template-columns:1fr 1fr} }
+@media(max-width:600px){ .pattern-grid,.concept-grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<nav>
+  <a href="../index.html" class="nav-logo">DSA <span>×</span> AI</a>
+  <div class="nav-stages">
+    <a href="../intent-routing/" class="nav-stage">01 Routing</a>
+    <a href="../session-memory/" class="nav-stage">02 Memory</a>
+    <a href="../orchestration/" class="nav-stage active">03 DAG</a>
+    <a href="../retrieval/" class="nav-stage">04 Search</a>
+    <a href="../scheduling/" class="nav-stage">05 Queue</a>
+    <a href="../async-tracking/" class="nav-stage">06 Async</a>
+    <a href="../guardrails/" class="nav-stage">07 Guard</a>
+    <a href="../streaming/" class="nav-stage">08 Stream</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow" style="background:radial-gradient(ellipse,rgba(91,143,255,.1) 0%,transparent 70%)"></div>
+  <div class="eyebrow"><span class="eyebrow-dot" style="background:#5B8FFF"></span>Stage 03 · Multi-Agent Orchestration</div>
+  <h1>Agents as <em style="color:#7AA3FF">nodes</em>. Handoffs as <em style="color:#7AA3FF">edges</em>.<br/>DAG controls the flow.</h1>
+  <p class="hero-sub">Directed acyclic graphs define which agents run, in what order, and which can run in parallel. No DAG = no reliable multi-agent coordination.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="#demo" class="btn-primary" style="background:#5B8FFF">Run the DAG</a>
+    <a href="#patterns" class="btn-secondary">See patterns</a>
+  </div>
+  <div class="scroll-hint"><span>SCROLL</span><div class="scroll-line"></div></div>
+</div>
+
+<div class="divider"></div>
+
+<section>
+  <div class="section-label">Overview</div>
+  <div class="section-title">Why a DAG?</div>
+  <p class="section-sub">A directed acyclic graph guarantees: no cycles (agents don't loop forever), dependency tracking (B runs only after A), and parallelism (A and B run together if independent).</p>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(91,143,255,.1)">🔀</div>
+      <div class="concept-title">Topological ordering</div>
+      <div class="concept-body">BFS/DFS on the DAG gives execution order. Agents with no in-edges run first. Kahn's algorithm detects cycles — if a cycle exists, it's a deadlock.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(91,143,255,.1)">⚡</div>
+      <div class="concept-title">Parallel branches</div>
+      <div class="concept-body">Independent branches (no shared dependency) execute concurrently. Fan-out from one node = spawn parallel agents. Fan-in = wait for all to complete.</div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon" style="background:rgba(91,143,255,.1)">🔍</div>
+      <div class="concept-title">Failure isolation</div>
+      <div class="concept-body">If one branch fails, only its downstream nodes are affected. The DAG structure makes it clear exactly which agents to retry or skip on error.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- LIVE DAG DEMO -->
+<div class="full-bg" id="demo">
+<div class="full-bg-wrap">
+  <div class="section-label">Live demo</div>
+  <div class="section-title">Watch agents execute across the DAG</div>
+  <p class="section-sub">Choose a workflow pattern, then hit Run. Watch topological execution — parallel branches fire together, dependent nodes wait.</p>
+
+  <div class="pattern-grid" id="pattern-grid">
+    <div class="pattern-card selected" onclick="selectPattern('sequential',this)">
+      <div class="pattern-title" style="color:#5B8FFF">Sequential chain</div>
+      <div class="pattern-desc">A → B → C. Each agent depends on previous output. Simple pipeline.</div>
+    </div>
+    <div class="pattern-card" onclick="selectPattern('parallel',this)">
+      <div class="pattern-title" style="color:#00D4A4">Parallel fan-out</div>
+      <div class="pattern-desc">Router → [A ‖ B ‖ C] → Merge. Branches execute simultaneously.</div>
+    </div>
+    <div class="pattern-card" onclick="selectPattern('diamond',this)">
+      <div class="pattern-title" style="color:#FFB347">Diamond DAG</div>
+      <div class="pattern-desc">Start → [A ‖ B] → Merge → End. Classic parallel-then-join.</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="dag-canvas-wrap">
+        <div class="panel-header">
+          <div class="panel-header-title" id="dag-pattern-label">Sequential chain</div>
+          <span class="badge badge-blue" id="dag-status-badge">idle</span>
+        </div>
+        <svg id="dag-svg" viewBox="0 0 440 280" style="width:100%;display:block;padding:10px"></svg>
+        <div style="padding:12px 16px 16px">
+          <div style="font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Execution log</div>
+          <div class="exec-log" id="exec-log"><span style="color:var(--dim)">Press Run to execute the DAG…</span></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="btn-run" style="background:#5B8FFF" id="dag-run-btn" onclick="runDAG()">▶ Run DAG</button>
+        <button class="btn-reset" onclick="resetDAG()">Reset</button>
+      </div>
+      <div class="code-block">
+        <div class="code-topbar"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div><div class="code-lang">Python · DAG execution</div></div>
+        <div class="code-body"><pre><span class="hl-kw">from</span> collections <span class="hl-kw">import</span> deque
+
+<span class="hl-kw">class</span> <span class="hl-cl">DAG</span>:
+    <span class="hl-kw">def</span> <span class="hl-fn">__init__</span>(self):
+        self.nodes = {}   <span class="hl-cm"># name → agent</span>
+        self.edges = {}   <span class="hl-cm"># name → [children]</span>
+        self.in_degree = {}
+
+    <span class="hl-kw">def</span> <span class="hl-fn">add_edge</span>(self, u, v):
+        self.edges[u].<span class="hl-fn">append</span>(v)
+        self.in_degree[v] += <span class="hl-nb">1</span>
+
+    <span class="hl-kw">def</span> <span class="hl-fn">topological_run</span>(self):
+        <span class="hl-cm"># Kahn's algorithm</span>
+        queue = <span class="hl-cl">deque</span>([
+            n <span class="hl-kw">for</span> n, d <span class="hl-kw">in</span>
+            self.in_degree.<span class="hl-fn">items</span>() <span class="hl-kw">if</span> d == <span class="hl-nb">0</span>
+        ])
+        <span class="hl-kw">while</span> queue:
+            <span class="hl-cm"># Run all zero-degree nodes</span>
+            <span class="hl-cm"># in parallel (asyncio.gather)</span>
+            ready = <span class="hl-fn">list</span>(queue); queue.<span class="hl-fn">clear</span>()
+            <span class="hl-kw">await</span> asyncio.<span class="hl-fn">gather</span>(*[
+                self.nodes[n].<span class="hl-fn">run</span>()
+                <span class="hl-kw">for</span> n <span class="hl-kw">in</span> ready
+            ])
+            <span class="hl-kw">for</span> n <span class="hl-kw">in</span> ready:
+                <span class="hl-kw">for</span> child <span class="hl-kw">in</span> self.edges[n]:
+                    self.in_degree[child] -= <span class="hl-nb">1</span>
+                    <span class="hl-kw">if</span> self.in_degree[child]==<span class="hl-nb">0</span>:
+                        queue.<span class="hl-fn">append</span>(child)
+
+<span class="hl-cm"># AWS Step Functions, LangGraph</span>
+<span class="hl-cm"># implement exact same pattern</span></pre></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
+<section id="patterns">
+  <div class="section-label">Comparison</div>
+  <div class="section-title">DAG vs alternatives</div>
+  <table class="cplx-table">
+    <thead><tr><th>Approach</th><th>Complexity</th><th>Parallelism</th><th>Cycle detection</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Linear chain</td><td><span class="mono-badge">O(N)</span></td><td>None</td><td>N/A</td><td>Simple pipelines</td></tr>
+      <tr><td>DAG (Kahn's)</td><td><span class="mono-badge">O(V+E)</span></td><td>Yes — fan-out</td><td>Yes</td><td>LangGraph, Step Functions, Airflow</td></tr>
+      <tr><td>State machine</td><td><span class="mono-badge">O(1)</span> per transition</td><td>No</td><td>Via design</td><td>Dialogflow CX, AWS Step Functions</td></tr>
+      <tr><td>Actor model</td><td><span class="mono-badge">O(1)</span> message send</td><td>Yes — native</td><td>No</td><td>Ray, Akka, Erlang</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+<div class="topic-nav">
+  <a href="../session-memory/" class="topic-nav-link">
+    <span class="topic-nav-label">← Previous</span>
+    <span class="topic-nav-title">02 · Session Memory</span>
+  </a>
+  <a href="../retrieval/" class="topic-nav-link next">
+    <span class="topic-nav-label">Next →</span>
+    <span class="topic-nav-title">04 · Knowledge Retrieval</span>
+  </a>
+</div>
+<footer>DSA × AI · <a href="../index.html">All topics</a> · Stage 03 of 08 — Orchestration</footer>
+
+<script>
+const PATTERNS = {
+  sequential: {
+    label: 'Sequential chain',
+    nodes: [
+      { id:'input', label:'Input', x:60, y:140 },
+      { id:'classify', label:'Classify', x:160, y:140 },
+      { id:'retrieve', label:'Retrieve', x:260, y:140 },
+      { id:'respond', label:'Respond', x:370, y:140 },
+    ],
+    edges: [['input','classify'],['classify','retrieve'],['retrieve','respond']],
+    steps: [['input'],['classify'],['retrieve'],['respond']]
+  },
+  parallel: {
+    label: 'Parallel fan-out',
+    nodes: [
+      { id:'router', label:'Router', x:60, y:140 },
+      { id:'billing', label:'Billing', x:180, y:60 },
+      { id:'tech', label:'Tech', x:180, y:140 },
+      { id:'refund', label:'Refund', x:180, y:220 },
+      { id:'merge', label:'Merge', x:310, y:140 },
+      { id:'reply', label:'Reply', x:400, y:140 },
+    ],
+    edges: [['router','billing'],['router','tech'],['router','refund'],['billing','merge'],['tech','merge'],['refund','merge'],['merge','reply']],
+    steps: [['router'],['billing','tech','refund'],['merge'],['reply']]
+  },
+  diamond: {
+    label: 'Diamond DAG',
+    nodes: [
+      { id:'start', label:'Start', x:60, y:140 },
+      { id:'agentA', label:'Agent A', x:190, y:70 },
+      { id:'agentB', label:'Agent B', x:190, y:210 },
+      { id:'merge', label:'Merge', x:320, y:140 },
+      { id:'end', label:'End', x:400, y:140 },
+    ],
+    edges: [['start','agentA'],['start','agentB'],['agentA','merge'],['agentB','merge'],['merge','end']],
+    steps: [['start'],['agentA','agentB'],['merge'],['end']]
+  }
+};
+
+let currentPattern = 'sequential';
+let running = false;
+
+function selectPattern(key, el) {
+  document.querySelectorAll('.pattern-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  currentPattern = key;
+  renderDAG(key);
+  document.getElementById('dag-pattern-label').textContent = PATTERNS[key].label;
+  clearLog();
+}
+
+function renderDAG(key, states = {}) {
+  const p = PATTERNS[key];
+  const svg = document.getElementById('dag-svg');
+  svg.innerHTML = '';
+
+  const ns = 'http://www.w3.org/2000/svg';
+
+  // Defs — arrowhead
+  const defs = document.createElementNS(ns,'defs');
+  const marker = document.createElementNS(ns,'marker');
+  marker.setAttribute('id','arr'); marker.setAttribute('viewBox','0 0 10 10');
+  marker.setAttribute('refX','22'); marker.setAttribute('refY','5');
+  marker.setAttribute('markerWidth','6'); marker.setAttribute('markerHeight','6');
+  marker.setAttribute('orient','auto');
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d','M2 2L8 5L2 8'); path.setAttribute('fill','none');
+  path.setAttribute('stroke','#2A2A3A'); path.setAttribute('stroke-width','1.5');
+  path.setAttribute('stroke-linecap','round');
+  marker.appendChild(path); defs.appendChild(marker); svg.appendChild(defs);
+
+  const nodeMap = {};
+  p.nodes.forEach(n => nodeMap[n.id] = n);
+
+  // Edges
+  p.edges.forEach(([from, to]) => {
+    const fn = nodeMap[from]; const tn = nodeMap[to];
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1', fn.x); line.setAttribute('y1', fn.y);
+    line.setAttribute('x2', tn.x); line.setAttribute('y2', tn.y);
+    const st = states[from] === 'done' ? '#5BDB85' : '#2A2A3A';
+    const sw = states[from] === 'done' ? '2' : '1.5';
+    line.setAttribute('stroke', st); line.setAttribute('stroke-width', sw);
+    line.setAttribute('marker-end','url(#arr)');
+    line.setAttribute('id','edge-'+from+'-'+to);
+    line.classList.add('dag-edge');
+    svg.appendChild(line);
+  });
+
+  // Nodes
+  p.nodes.forEach(n => {
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('id','node-'+n.id);
+    g.classList.add('dag-node', states[n.id] || 'idle');
+    g.onclick = () => {};
+
+    const c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', '28');
+    g.appendChild(c);
+
+    const t = document.createElementNS(ns,'text');
+    t.setAttribute('x', n.x); t.setAttribute('y', n.y);
+    t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-size','11'); t.setAttribute('font-family',"'Space Grotesk',sans-serif");
+    t.setAttribute('font-weight','600');
+    t.textContent = n.label;
+    g.appendChild(t);
+
+    svg.appendChild(g);
+  });
+}
+
+function setNodeState(nodeId, state) {
+  const g = document.getElementById('node-'+nodeId);
+  if (!g) return;
+  g.classList.remove('idle','running','done','blocked');
+  g.classList.add(state);
+}
+
+function addLog(msg, color='#8080A0') {
+  const log = document.getElementById('exec-log');
+  if (log.children[0]?.style?.color === 'var(--dim)') log.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span style="color:var(--dim)">[${new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'})}]</span> <span style="color:${color}">${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  requestAnimationFrame(() => div.classList.add('show'));
+}
+
+function clearLog() {
+  document.getElementById('exec-log').innerHTML = '<span style="color:var(--dim)">Press Run to execute the DAG…</span>';
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runDAG() {
+  if (running) return;
+  running = true;
+  const btn = document.getElementById('dag-run-btn');
+  btn.disabled = true;
+  clearLog();
+  renderDAG(currentPattern);
+  const badge = document.getElementById('dag-status-badge');
+  badge.textContent = 'running'; badge.style.background = 'rgba(91,143,255,.15)'; badge.style.color = '#5B8FFF';
+
+  const p = PATTERNS[currentPattern];
+  const states = {};
+  p.nodes.forEach(n => states[n.id] = 'idle');
+
+  for (const step of p.steps) {
+    // Set all in step to running
+    step.forEach(id => {
+      states[id] = 'running';
+      setNodeState(id, 'running');
+    });
+    const label = step.length > 1 ? step.join(' ‖ ') + ' (parallel)' : step[0];
+    addLog(`▶ Running: ${label}`, '#5B8FFF');
+    await delay(step.length > 1 ? 1400 : 900);
+
+    step.forEach(id => {
+      states[id] = 'done';
+      setNodeState(id, 'done');
+      // Update outgoing edges
+      p.edges.filter(([f]) => f === id).forEach(([f,t]) => {
+        const edge = document.getElementById('edge-'+f+'-'+t);
+        if (edge) { edge.setAttribute('stroke','#5BDB85'); edge.setAttribute('stroke-width','2'); }
+      });
+    });
+    addLog(`✓ Done: ${step.join(', ')}`, '#5BDB85');
+    await delay(300);
+  }
+
+  badge.textContent = 'complete ✓'; badge.style.background = 'rgba(91,219,133,.15)'; badge.style.color = '#5BDB85';
+  addLog('DAG execution complete.', '#5BDB85');
+  running = false; btn.disabled = false;
+}
+
+function resetDAG() {
+  if (running) return;
+  renderDAG(currentPattern);
+  clearLog();
+  const badge = document.getElementById('dag-status-badge');
+  badge.textContent = 'idle'; badge.style.background = 'var(--surface2)'; badge.style.color = 'var(--dim)';
+}
+
+renderDAG('sequential');
+</script>
+</body>
+</html>
