@@ -204,6 +204,71 @@ svg#dag-svg { display: block; width: 100%; }
 </section>
 
 <div class="divider"></div>
+
+<div class="full-bg">
+<div class="full-bg-wrap">
+  <div class="section-label">Key insights</div>
+  <div class="section-title">What engineers get wrong</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px">
+    <div style="background:var(--surface);border:1px solid rgba(91,143,255,.2);border-radius:14px;padding:24px;border-left:3px solid #5B8FFF">
+      <div style="font-size:12px;font-weight:700;color:#5B8FFF;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Cycles = Deadlock</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">A cycle in the agent graph means two agents each wait for the other's output forever. Kahn's algorithm detects this: if topological sort can't process all nodes (remaining in-degree > 0 nodes exist), a cycle is present. <strong>Always run cycle detection before executing any new DAG topology.</strong></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid rgba(91,143,255,.2);border-radius:14px;padding:24px;border-left:3px solid #5B8FFF">
+      <div style="font-size:12px;font-weight:700;color:#5B8FFF;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Dynamic graphs</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">Static DAGs are easy. Dynamic DAGs — where an agent's output determines which agents run next — require the orchestrator to rebuild topology at runtime. LangGraph supports this via conditional edges. Cost: cycle detection must re-run on every topology mutation.</div>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-top:8px">Topological execution detail</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Kahn's algorithm (BFS-based)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        1. Compute in-degree for all nodes<br/>
+        2. Queue nodes with in-degree = 0<br/>
+        3. Pop node → run agent → decrement children's in-degree<br/>
+        4. If child's in-degree → 0, add to queue<br/>
+        5. Parallel: run all queued nodes with asyncio.gather()<br/>
+        6. If processed count &lt; total nodes → cycle detected
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Failure isolation in DAG</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        When node B fails:<br/>
+        • Mark B as failed<br/>
+        • All downstream nodes of B are skipped (not retried)<br/>
+        • Parallel branches of B unaffected — continue<br/>
+        • Root-level error handler collects partial results<br/>
+        • Retry policy applies only to B and its subtree
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Real-world systems</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#5B8FFF;margin-bottom:6px">LangGraph</div>
+      <div style="font-size:12px;color:var(--muted)">Explicit DAG of LangChain agents. Supports conditional edges (dynamic topology), human-in-the-loop nodes, and streaming intermediate results.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#5B8FFF;margin-bottom:6px">AWS Step Functions</div>
+      <div style="font-size:12px;color:var(--muted)">State machine (DAG) where each state = one Lambda/agent invocation. ASL (Amazon States Language) defines the graph as JSON. Built-in retry, catch, parallel states.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#5B8FFF;margin-bottom:6px">Apache Airflow</div>
+      <div style="font-size:12px;color:var(--muted)">DAG-based workflow orchestrator. Each task is a node. Dependencies declared as edges. Used to orchestrate LLM pipelines in data engineering teams.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#5B8FFF;margin-bottom:6px">AWS Bedrock Multi-Agent</div>
+      <div style="font-size:12px;color:var(--muted)">Supervisor agent + sub-agents topology. Supervisor routes to sub-agents dynamically. DynamoDB stores workflow state across async invocations.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
 <div class="topic-nav">
   <a href="../session-memory/" class="topic-nav-link">
     <span class="topic-nav-label">← Previous</span>

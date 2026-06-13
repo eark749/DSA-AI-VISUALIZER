@@ -260,6 +260,86 @@ state = <span class="hl-nb">0</span>
 </section>
 
 <div class="divider"></div>
+
+<div class="full-bg">
+<div class="full-bg-wrap">
+  <div class="section-label">Key insights</div>
+  <div class="section-title">What engineers get wrong</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px">
+    <div style="background:var(--surface);border:1px solid rgba(255,82,82,.2);border-radius:14px;padding:24px;border-left:3px solid #FF5252">
+      <div style="font-size:12px;font-weight:700;color:#FF5252;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Aho-Corasick alone isn't enough</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">Pattern matching blocks known bad strings but can't detect novel jailbreaks, adversarial prompts, or context-dependent harm. "Ignore previous instructions" has no banned keyword. Real production guardrails layer Aho-Corasick (fast, zero false negatives on known patterns) with an ML classifier (contextual, catches novel attacks).</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid rgba(255,82,82,.2);border-radius:14px;padding:24px;border-left:3px solid #FF5252">
+      <div style="font-size:12px;font-weight:700;color:#FF5252;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Stream scanning latency</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">Aho-Corasick shines on streams: O(m) where m = text length, regardless of pattern count. A naive approach (re.search per pattern) is O(m × p) — 10 patterns = 10× slower. For streaming output with 50 banned patterns, Aho-Corasick adds &lt;0.1ms; naive regex adds ~5ms per chunk.</div>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-top:8px">Automaton construction</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Trie + failure links (BFS)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        1. Insert all patterns into trie (prefix tree)<br/>
+        2. BFS from root: for each node, compute failure link = longest proper suffix that is also a prefix of another pattern<br/>
+        3. Compute output links: which patterns match at each node<br/>
+        4. At scan time: follow char transitions, fall back via failure links on mismatch
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Production layers</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        Layer 1: Aho-Corasick — banned keywords, PII regex (SSN, card numbers)<br/>
+        Layer 2: ML classifier — intent/toxicity (OpenAI moderation API, Perspective API)<br/>
+        Layer 3: LLM self-check — "Does this response comply with policy?" (slow, expensive, for high-stakes only)<br/>
+        Layer 4: Output filtering — redact matched spans
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Alternatives</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">ML moderation classifier</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Fine-tuned BERT/DistilBERT on policy violation dataset. Scores intent/toxicity/PII. ~5–20ms. Handles paraphrased or encoded attacks.</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: novel attacks, context-dependent harm, multilingual</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Prompt shields (Azure)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Dedicated API for jailbreak + indirect prompt injection detection. Runs before model. Returns risk scores per category (violence, hate, sexual, self-harm).</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: Azure stack, regulated industries, need audit trail</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Constitutional AI (self-critique)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Model critiques its own output against a constitution (rules). Revises if violation found. Anthropic Claude trained this way. Expensive (~2× tokens) but captures nuanced harms.</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: nuanced policy, can afford latency, LLM-as-judge acceptable</div>
+    </div>
+  </div>
+
+  <div class="section-label">Real-world systems</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FF5252;margin-bottom:6px">OpenAI Moderation API</div>
+      <div style="font-size:12px;color:var(--muted)">Free ML classifier. 11 harm categories. Returns per-category scores + flagged bool. Integrated into ChatGPT input/output pipeline.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FF5252;margin-bottom:6px">Llama Guard</div>
+      <div style="font-size:12px;color:var(--muted)">Open-source safety classifier from Meta. Runs as a separate model call. Customizable policy taxonomy. Used in self-hosted LLM deployments.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FF5252;margin-bottom:6px">NeMo Guardrails</div>
+      <div style="font-size:12px;color:var(--muted)">NVIDIA's programmable guardrail framework. Colang language defines input/output rails as rules. Wraps any LLM. Aho-Corasick used for exact pattern matching layer.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FF5252;margin-bottom:6px">Perspective API</div>
+      <div style="font-size:12px;color:var(--muted)">Google Jigsaw toxicity scorer. TOXICITY, SEVERE_TOXICITY, IDENTITY_ATTACK, THREAT scores. Used by Discord, NYT comments for moderation pipelines.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
 <div class="topic-nav">
   <a href="../async-tracking/" class="topic-nav-link">
     <span class="topic-nav-label">← Previous</span>

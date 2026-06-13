@@ -192,6 +192,86 @@ task_queue = []
 </section>
 
 <div class="divider"></div>
+
+<div class="full-bg">
+<div class="full-bg-wrap">
+  <div class="section-label">Key insights</div>
+  <div class="section-title">What engineers get wrong</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px">
+    <div style="background:var(--surface);border:1px solid rgba(255,179,71,.2);border-radius:14px;padding:24px;border-left:3px solid #FFB347">
+      <div style="font-size:12px;font-weight:700;color:#FFB347;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Starvation via aging</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">A pure min-heap starves low-priority tasks if high-priority work keeps arriving. Fix: <strong>aging</strong> — every T seconds, boost each waiting task's priority by 1 level. This ensures even P5 Background tasks eventually reach P1 and get scheduled. Implement as: <code>effective_priority = priority - floor(wait_time / aging_interval)</code>.</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid rgba(255,179,71,.2);border-radius:14px;padding:24px;border-left:3px solid #FFB347">
+      <div style="font-size:12px;font-weight:700;color:#FFB347;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Priority inversion</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">Low-priority task holds a resource (DB lock, mutex) that a high-priority task needs. High-priority task blocks. Medium tasks run. Result: high-priority task effectively executes at low priority. Fix: <strong>priority inheritance</strong> — temporarily boost blocking task's priority to match the waiting task's priority.</div>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-top:8px">Heap operations recap</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">heapify-up (after push)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;font-family:var(--mono)">
+        Insert at end → compare with parent<br/>
+        If child &lt; parent → swap → repeat<br/>
+        Until root or child ≥ parent<br/>
+        O(log N) swaps worst case
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">heapify-down (after pop)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;font-family:var(--mono)">
+        Move last → root → compare with children<br/>
+        Swap with smaller child if smaller<br/>
+        Repeat until leaf or both children ≥ node<br/>
+        O(log N) swaps worst case
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Alternatives</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Round-robin queue</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Each priority level has its own FIFO queue. Scheduler cycles through queues weighted by priority. Prevents starvation by design.</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: fixed priority levels, fairness critical, simple impl needed</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Weighted Fair Queue (WFQ)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Assigns bandwidth/CPU share proportionally. Each flow gets guaranteed minimum. Used in network QoS and OS schedulers (CFS in Linux).</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: multiple tenants, SLA guarantees per client</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Deadline scheduling (EDF)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Earliest Deadline First. Always run task with nearest deadline. Optimal for real-time systems when utilization &lt; 100%.</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: hard latency SLOs, time-critical agent tasks</div>
+    </div>
+  </div>
+
+  <div class="section-label">Real-world systems</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FFB347;margin-bottom:6px">Celery + Redis</div>
+      <div style="font-size:12px;color:var(--muted)">Priority queues via multiple Redis lists. Celery beat for cron scheduling. Used by Notion, Robinhood for background AI tasks.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FFB347;margin-bottom:6px">Ray (RayQueue)</div>
+      <div style="font-size:12px;color:var(--muted)">Distributed priority scheduling across a cluster. Used by Anyscale, Weights & Biases for LLM inference workload routing.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FFB347;margin-bottom:6px">Kubernetes scheduler</div>
+      <div style="font-size:12px;color:var(--muted)">PriorityClass objects assign integer priorities to pods. Preemption: high-priority pod can evict lower-priority pod to free nodes.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#FFB347;margin-bottom:6px">OpenAI Batch API</div>
+      <div style="font-size:12px;color:var(--muted)">Queues non-urgent requests for 50% cost reduction. Internal priority queue separates sync (real-time) from async (batch) lanes.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
 <div class="topic-nav">
   <a href="../retrieval/" class="topic-nav-link">
     <span class="topic-nav-label">← Previous</span>

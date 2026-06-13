@@ -790,6 +790,99 @@
 
 <div class="divider"></div>
 
+<!-- ENGINEER CHECKLIST -->
+<div class="full-bg">
+<div class="full-bg-wrap">
+  <div class="section-label">Engineer checklist</div>
+  <div class="section-title">Before shipping your AI pipeline to production</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:40px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px">Routing &amp; Memory</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#6C63FF;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Trie prefix matches tested with overlapping prefixes (e.g., "hey" vs "hey there")</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#6C63FF;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">HashMap dispatch has fallback handler for unrecognized intents</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#00D4A4;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Deque token budget set and tested — verify eviction triggers correctly</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#00D4A4;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">LRU cache capacity sized for concurrent session count (not just one user)</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#00D4A4;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Session persistence strategy chosen (Redis TTL or in-memory)</span></div>
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px">Orchestration &amp; Retrieval</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#5B8FFF;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">DAG cycle detection runs on every new topology (not just at startup)</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#5B8FFF;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Agent failure in DAG is isolated — downstream nodes skipped, parallel branches unaffected</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FF6B9D;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">HNSW ef_search benchmarked on your corpus — recall vs latency plotted</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FF6B9D;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Hybrid retrieval (dense + sparse) tested — NDCG measured vs each alone</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FF6B9D;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Index replication/failover plan exists (single vector DB = single point of failure)</span></div>
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px">Scheduling &amp; Async</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FFB347;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Priority aging implemented to prevent low-priority task starvation</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FFB347;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Heap load tested at max queue depth — pop latency measured under pressure</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#5BDB85;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Every async tool call wrapped in asyncio.wait_for() with per-tool timeout</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#5BDB85;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Cancelled futures removed from HashMap — no reference leaks under timeout storms</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#5BDB85;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">gather(return_exceptions=True) used — single tool failure doesn't cancel parallel calls</span></div>
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px">Safety &amp; Streaming</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FF5252;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Aho-Corasick + ML classifier both present — pattern match alone isn't enough</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FF5252;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Guardrails run on both input AND output — not just one direction</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#FF5252;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Adversarial test set (jailbreaks, encoded attacks) run against guardrail layer</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#A78BFA;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Ring buffer size set: large enough to absorb burst, small enough to bound latency</span></div>
+        <div style="display:flex;align-items:flex-start;gap:10px"><span style="color:#A78BFA;font-size:14px;margin-top:1px;flex-shrink:0">→</span><span style="font-size:13px;color:var(--muted)">Incremental JSON parser used (not hand-rolled) — split escape sequences handled correctly</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Observability</div>
+  <div class="section-title">What to instrument</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;color:#6C63FF;margin-bottom:8px">ROUTING</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.8">
+        intent_distribution (histogram)<br/>
+        trie_traversal_depth (p99)<br/>
+        unmatched_intent_rate (%)<br/>
+        dispatch_latency (ms)
+      </div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;color:#00D4A4;margin-bottom:8px">MEMORY</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.8">
+        session_eviction_rate (%)<br/>
+        avg_context_tokens_used<br/>
+        lru_cache_hit_rate (%)<br/>
+        active_sessions_gauge
+      </div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;color:#FF6B9D;margin-bottom:8px">RETRIEVAL</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.8">
+        vector_search_latency (p50/p99)<br/>
+        recall@k (eval set)<br/>
+        index_size_bytes<br/>
+        hybrid_rrf_score_dist
+      </div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;color:#FF5252;margin-bottom:8px">SAFETY</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.8">
+        guardrail_block_rate (%)<br/>
+        pattern_hit_counts (per-pattern)<br/>
+        ml_classifier_latency<br/>
+        false_positive_rate (human review)
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+
 <footer>
   <div style="margin-bottom:12px">
     <a href="./intent-routing/">01</a> ·

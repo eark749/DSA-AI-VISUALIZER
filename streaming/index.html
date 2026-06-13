@@ -268,6 +268,87 @@ parser = ijson.<span class="hl-fn">parse</span>(stream)
 </section>
 
 <div class="divider"></div>
+
+<div class="full-bg">
+<div class="full-bg-wrap">
+  <div class="section-label">Key insights</div>
+  <div class="section-title">What engineers get wrong</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px">
+    <div style="background:var(--surface);border:1px solid rgba(167,139,250,.2);border-radius:14px;padding:24px;border-left:3px solid #A78BFA">
+      <div style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Ring buffer prevents HOL blocking</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">Head-of-line blocking: a slow consumer stalls the entire stream. A ring buffer decouples producer (LLM token generator) from consumer (HTTP write). Producer always writes to next slot; consumer reads at its own pace. If consumer is too slow, buffer wraps and overwrites — by design. For streaming responses, this keeps P99 latency flat even during backpressure.</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid rgba(167,139,250,.2);border-radius:14px;padding:24px;border-left:3px solid #A78BFA">
+      <div style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:10px;letter-spacing:.06em">KEY INSIGHT — Incremental JSON is hard</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.7">Standard <code>JSON.parse()</code> requires the full string. Incremental parsing must track: current depth, whether inside a string, escape state. The failure mode is subtle: a token boundary can split a multi-byte character or escape sequence. Libraries like <code>jsonstream</code> (Node) and <code>ijson</code> (Python) handle this correctly. Don't roll your own for production.</div>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-top:8px">Transport layer</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Server-Sent Events (SSE)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        HTTP/1.1 keep-alive, text/event-stream content-type<br/>
+        Format: <code>data: {"token":"..."}\n\n</code><br/>
+        Browser-native via EventSource API<br/>
+        Auto-reconnects on disconnect (Last-Event-ID)<br/>
+        Used by: OpenAI streaming, Anthropic streaming, Claude.ai
+      </div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Post-stream validation</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        Stream first, validate after: buffer the complete JSON, run Pydantic/Zod validation on final object<br/>
+        Trade-off: user sees content before it's validated<br/>
+        Alternative: speculative streaming — display optimistically, overlay error UI if validation fails<br/>
+        Anthropic Claude uses extended thinking tokens which are streamed but not shown
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Alternatives</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">WebSocket (bidirectional)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Full-duplex: client can send mid-stream (interrupt, steer). More complex than SSE. Required for voice/realtime APIs (OpenAI Realtime API uses WebSocket).</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: voice, interrupts, bi-directional mid-stream control</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">HTTP chunked transfer</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Transfer-Encoding: chunked. Each chunk prefixed with hex size. Works with any HTTP client. Lower-level than SSE — no auto-reconnect, no event ID. Fetch API handles it via ReadableStream.</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: non-browser clients, raw HTTP, no SSE library available</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">gRPC server streaming</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Protobuf-framed stream over HTTP/2. Strongly typed schema, multiplexed over single connection. Lower overhead than SSE for high-throughput token streams.</div>
+      <div style="font-size:11px;color:var(--dim)">Use when: gRPC stack, internal microservices, typed schema required</div>
+    </div>
+  </div>
+
+  <div class="section-label">Real-world systems</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:6px">Vercel AI SDK</div>
+      <div style="font-size:12px;color:var(--muted)">useChat hook streams SSE via ReadableStream. Handles partial JSON, tool call streaming, and attachment streaming out of the box.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:6px">LangChain streaming</div>
+      <div style="font-size:12px;color:var(--muted)">Callbacks (on_llm_new_token) + AsyncIterator. astream() yields BaseMessageChunk objects. LCEL pipes support streaming natively through each chain step.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:6px">Anthropic streaming</div>
+      <div style="font-size:12px;color:var(--muted)">SSE events: message_start → content_block_delta (text) → tool_use_delta (JSON) → message_stop. Ring buffer used internally to pace output to client write speed.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#A78BFA;margin-bottom:6px">tRPC subscriptions</div>
+      <div style="font-size:12px;color:var(--muted)">Type-safe streaming from Next.js backend to React frontend. AsyncGenerator on server → observable on client. Full-stack type inference on streamed data shape.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
 <div class="topic-nav">
   <a href="../guardrails/" class="topic-nav-link">
     <span class="topic-nav-label">← Previous</span>
